@@ -1,0 +1,300 @@
+@prefix c2t: <https://w3id.org/c2t/o#> .
+@prefix dpv: <http://dockerpedia.inf.utfsm.cl/vocab#> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix sd: <http://schema.org/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+@base <https://w3id.org/c2t/o#> .
+
+<https://w3id.org/c2t/o#> rdf:type owl:Ontology ;
+    dct:creator "Andrei Iulian Grozescu" ;
+    dct:title "Extended Containers To Triples Ontology"@en ;
+    dct:description "Extended ontology for modelling Docker images, containers, hosts and vulnerabilities."@en ;
+    dct:license <https://opensource.org/licenses/Apache-2.0> ;
+    dct:created "2025-12-17"^^xsd:date .
+
+#################################################################
+#    Annotation Properties
+#################################################################
+
+dct:creator rdf:type owl:AnnotationProperty .
+dct:title rdf:type owl:AnnotationProperty .
+dct:description rdf:type owl:AnnotationProperty .
+dct:license rdf:type owl:AnnotationProperty .
+dct:created rdf:type owl:AnnotationProperty .
+
+#################################################################
+#    Object Properties
+#################################################################
+
+c2t:buildsImage rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:Dockerfile ;
+    rdfs:range c2t:Image ;
+    rdfs:label "buildsImage"@en ;
+    rdfs:comment "A Dockerfile contains instructions to build a Docker Image."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#buildsImage> ;
+    owl:inverseOf c2t:isBuiltFrom .
+
+c2t:isBuiltFrom rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:Image ;
+    rdfs:range c2t:Dockerfile ;
+    rdfs:label "isBuiltFrom"@en ;
+    rdfs:comment "Indicates the Dockerfile used to build this Image."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#isBuiltFrom> .
+
+c2t:hasLayer rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:Image ;
+    rdfs:range c2t:ImageLayer ;
+    rdfs:label "hasLayer"@en ;
+    rdfs:comment "An Image is composed of a set of ImageLayers."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#hasLayer> .
+
+c2t:hasOperatingSystem rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:Image , c2t:Host ;
+    rdfs:range c2t:OperatingSystem ;
+    rdfs:label "hasOperatingSystem"@en ;
+    rdfs:comment "Links an entity (Image or Host) to its Operating System."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#hasOperatingSystem> .
+
+c2t:hasInstance rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:Image ;
+    rdfs:range c2t:Container ;
+    rdfs:label "hasInstance"@en ;
+    rdfs:comment "An Image can have multiple running Container instances."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#hasInstance> ;
+    owl:inverseOf c2t:isInstanceOf .
+
+c2t:isInstanceOf rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:Container ;
+    rdfs:range c2t:Image ;
+    rdfs:label "isInstanceOf"@en ;
+    rdfs:comment "A Container is an instantiated running version of an Image."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#isInstanceOf> .
+
+c2t:isDeployedOn rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:Container ;
+    rdfs:range c2t:Host ;
+    rdfs:label "isDeployedOn"@en ;
+    rdfs:comment "Indicates the physical or virtual Host where the Container is running."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#isDeployedOn> ;
+    owl:inverseOf c2t:deploysContainer .
+
+c2t:deploysContainer rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:Host ;
+    rdfs:range c2t:Container ;
+    rdfs:label "deploysContainer"@en ;
+    rdfs:comment "A Host deploys and runs one or more Containers."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#deploysContainer> .
+
+c2t:hasPackageVersion rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:ImageLayer ;
+    rdfs:range c2t:PackageVersion ;
+    rdfs:label "hasPackageVersion"@en ;
+    rdfs:comment "Links an Image Layer to the specific software packages installed in it."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#hasPackageVersion> .
+
+c2t:hasVulnerability rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:PackageVersion , c2t:OperatingSystem ;
+    rdfs:range c2t:Vulnerability ;
+    rdfs:label "hasVulnerability"@en ;
+    rdfs:comment "Indicates that a software component (Package or OS) is affected by a specific Vulnerability."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#hasVulnerability> .
+
+c2t:distributionOf rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:OperatingSystem ;
+    rdfs:range c2t:OperatingSystem ;
+    rdfs:label "distributionOf"@en ;
+    rdfs:comment "Links a specific operating system version/distro to its parent distribution family."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#distributionOf> .
+
+c2t:partOfDockerfile rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:DockerfileStep ;
+    rdfs:range c2t:Dockerfile ;
+    rdfs:label "partOfDockerfile"@en .
+
+#################################################################
+#    Data Properties
+#################################################################
+
+c2t:architecture rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Image , c2t:Host ;
+    rdfs:range xsd:string ;
+    rdfs:label "architecture"@en ;
+    rdfs:comment "The CPU architecture (e.g., amd64, arm64) of the Image or Host."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#architecture> .
+
+c2t:hostType rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Host ;
+    rdfs:range xsd:string ;
+    rdfs:label "hostType"@en ;
+    rdfs:comment "The type of host environment (e.g., virtual machine, physical server, cloud instance)."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#hostType> .
+
+c2t:ipAddress rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Host ;
+    rdfs:range xsd:string ;
+    rdfs:label "ipAddress"@en ;
+    rdfs:comment "The network IP address associated with the Host."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#ipAddress> .
+
+c2t:status rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Container ;
+    rdfs:range xsd:string ;
+    rdfs:label "status"@en ;
+    rdfs:comment "The current execution status of the Container (e.g., running, exited, paused)."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#status> .
+
+c2t:ports rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Container ;
+    rdfs:range xsd:string ;
+    rdfs:label "ports"@en ;
+    rdfs:comment "The network ports exposed by the Container."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#ports> .
+
+dpv:size rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Image , c2t:PackageVersion ;
+    rdfs:range xsd:integer ;
+    rdfs:label "size"@en ;
+    rdfs:comment "The size of the resource in bytes."@en ;
+    rdfs:isDefinedBy <http://dockerpedia.inf.utfsm.cl/vocab#size> .
+
+dpv:tag rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Image ;
+    rdfs:range xsd:string ;
+    rdfs:label "tag"@en ;
+    rdfs:comment "The specific tag identifier of the Docker Image (e.g., 'latest', 'v1.0')."@en ;
+    rdfs:isDefinedBy <http://dockerpedia.inf.utfsm.cl/vocab#tag> .
+
+sd:dateCreated rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Image ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "dateCreated"@en ;
+    rdfs:comment "The timestamp when the Image was built or created."@en ;
+    rdfs:isDefinedBy <http://schema.org/dateCreated> .
+
+sd:hasVersion rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:PackageVersion , c2t:OperatingSystem ;
+    rdfs:label "hasVersion"@en ;
+    rdfs:comment "The version string of the software package or operating system."@en ;
+    rdfs:isDefinedBy <http://schema.org/hasVersion> .
+
+c2t:packageType rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:PackageVersion ;
+    rdfs:range xsd:string ;
+    rdfs:label "packageType"@en ;
+    rdfs:comment "The type of software package (e.g., binary, source, library)."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#packageType> .
+
+c2t:severity rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Vulnerability ;
+    rdfs:range xsd:string ;
+    rdfs:label "severity"@en ;
+    rdfs:comment "The qualitative severity level of the vulnerability (e.g., Low, Medium, Critical)."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#severity> .
+
+c2t:score rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Vulnerability ;
+    rdfs:range xsd:float ;
+    rdfs:label "score"@en ;
+    rdfs:comment "The quantitative CVSS score assigned to the vulnerability."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#score> .
+
+c2t:vector rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Vulnerability ;
+    rdfs:range xsd:string ;
+    rdfs:label "vector"@en ;
+    rdfs:comment "The CVSS vector string describing the vulnerability characteristics."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#vector> .
+
+c2t:fixedIn rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Vulnerability ;
+    rdfs:range xsd:string ;
+    rdfs:label "fixedIn"@en ;
+    rdfs:comment "The version number where the vulnerability has been patched/fixed."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#fixedIn> .
+
+c2t:vulnerabilityType rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Vulnerability ;
+    rdfs:range xsd:string ;
+    rdfs:label "vulnerabilityType"@en ;
+    rdfs:comment "The category or type of the vulnerability (e.g., SQL Injection, Buffer Overflow)."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#vulnerabilityType> .
+
+### c2t:content
+c2t:content rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Dockerfile ;
+    rdfs:range xsd:string ;
+    rdfs:label "content"@en ;
+    rdfs:comment "The reconstructed text instructions of the Dockerfile."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#content> .
+
+### c2t:stepOrder
+c2t:stepOrder rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:DockerfileStep ;
+    rdfs:range xsd:integer ;
+    rdfs:label "stepOrder"@en ;
+    rdfs:comment "The chronological order of the instruction in the Dockerfile."@en .
+
+### c2t:instruction
+c2t:instruction rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:DockerfileStep ;
+    rdfs:range xsd:string ;
+    rdfs:label "instruction"@en ;
+    rdfs:comment "The actual text of the instruction (e.g., 'RUN apt-get update')."@en .
+
+#################################################################
+#    Classes
+#################################################################
+
+c2t:Dockerfile rdf:type owl:Class ;
+    owl:equivalentClass dpv:Dockerfile ;
+    rdfs:label "Dockerfile"@en ;
+    rdfs:comment "A text document that contains all the commands a user could call on the command line to assemble an image."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#Dockerfile> .
+
+c2t:DockerfileStep rdf:type owl:Class ;
+    rdfs:label "DockerfileStep"@en ;
+    rdfs:comment "A single instruction line within a Dockerfile."@en .
+
+c2t:Image rdf:type owl:Class ;
+    owl:equivalentClass dpv:SoftwareImage ;
+    rdfs:label "Image"@en ;
+    rdfs:comment "A read-only template with instructions for creating a Docker container."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#Image> .
+
+c2t:Container rdf:type owl:Class ;
+    rdfs:label "Container"@en ;
+    rdfs:comment "A standard unit of software that packages up code and all its dependencies so the application runs quickly and reliably."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#Container> .
+
+c2t:Host rdf:type owl:Class ;
+    rdfs:label "Host"@en ;
+    rdfs:comment "A computer (physical or virtual) that runs the Docker daemon and executes containers."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#Host> .
+
+c2t:ImageLayer rdf:type owl:Class ;
+    owl:equivalentClass dpv:ImageLayer ;
+    rdfs:label "ImageLayer"@en ;
+    rdfs:comment "Represents a single layer in a Docker Image filesystem, usually corresponding to an instruction in the Dockerfile."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#ImageLayer> .
+
+c2t:PackageVersion rdf:type owl:Class ;
+    owl:equivalentClass dpv:PackageVersion ;
+    rdfs:label "PackageVersion"@en ;
+    rdfs:comment "A specific version of a software package installed within an Image or OS."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#PackageVersion> .
+
+c2t:OperatingSystem rdf:type owl:Class ;
+    owl:equivalentClass dpv:OperatingSystem ;
+    rdfs:label "OperatingSystem"@en ;
+    rdfs:comment "The software that supports a computer's basic functions and provides services for other programs."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#OperatingSystem> .
+
+c2t:Vulnerability rdf:type owl:Class ;
+    owl:equivalentClass dpv:SoftwareVulnerability ;
+    rdfs:label "Vulnerability"@en ;
+    rdfs:comment "A weakness or flaw in software, defined in databases like CVE (Common Vulnerabilities and Exposures)."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#Vulnerability> .

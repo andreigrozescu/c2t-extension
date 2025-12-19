@@ -1,0 +1,131 @@
+prefixes:
+  c2t: "https://w3id.org/c2t/o#"
+  c2ti: "https://w3id.org/c2t/instance/"
+  dct: "http://purl.org/dc/terms/"
+  rdfs: "http://www.w3.org/2000/01/rdf-schema#"
+  schema: "http://schema.org/"
+  dpv: "http://dockerpedia.inf.utfsm.cl/vocab#"
+  xsd: "http://www.w3.org/2001/XMLSchema#"
+
+mappings:
+
+  HostMapping:
+    sources: [['unified_data.json~jsonpath', '$.host[*]']]
+    s: c2ti:Host/$(id)
+    po:
+      - [a, c2t:Host]
+      - [dct:identifier, $(id), xsd:string]
+      - [c2t:ipAddress, $(ip), xsd:string]
+      - [c2t:architecture, $(architecture), xsd:string]
+
+  ContainerMapping:
+    sources: [['unified_data.json~jsonpath', '$.containers[*]']]
+    s: c2ti:Container/$(id)
+    po:
+      - [a, c2t:Container]
+      - [dct:identifier, $(id), xsd:string]
+      - [rdfs:label, $(name), xsd:string]
+      - [c2t:status, $(status), xsd:string]
+      - [c2t:isInstanceOf, c2ti:Image/$(isInstanceOf)~iri]
+      - [c2t:isDeployedOn, c2ti:Host/$(isDeployedOn)~iri]
+      - [c2t:ports, $(ports), xsd:string]
+      - [schema:dateCreated, $(created), xsd:string]
+
+  ImageMapping:
+    sources: [['unified_data.json~jsonpath', '$.images[*]']]
+    s: c2ti:Image/$(identifier)
+    po:
+      - [a, c2t:Image]
+      - [rdfs:label, $(raw_identifier), xsd:string]
+      - [dct:identifier, $(raw_identifier), xsd:string]
+      - [c2t:architecture, $(architecture), xsd:string]
+      - [dpv:size, $(size), xsd:integer]
+      - [schema:dateCreated, $(created), xsd:string]
+      - [c2t:hasOperatingSystem, c2ti:OperatingSystem/$(identifier)~iri]
+      - [c2t:isBuiltFrom, c2ti:Dockerfile/dockerfile_$(identifier)~iri]
+
+  DockerfileMapping:
+    sources: [['unified_data.json~jsonpath', '$.dockerfiles[*]']]
+    s: c2ti:Dockerfile/$(id)
+    po:
+      - [a, c2t:Dockerfile]
+      - [dct:identifier, $(id), xsd:string]
+      - [rdfs:label, $(label), xsd:string]
+      - [c2t:content, $(content), xsd:string]
+      - [c2t:buildsImage, c2ti:Image/$(image_identifier)~iri]
+
+  DockerfileStepsMapping:
+    sources: [['unified_data.json~jsonpath', '$.dockerfile_steps[*]']]
+    s: c2ti:DockerfileStep/$(step_id)
+    po:
+      - [a, c2t:DockerfileStep]
+      - [c2t:stepOrder, $(order), xsd:integer]
+      - [c2t:instruction, $(instruction), xsd:string]
+      - [c2t:partOfDockerfile, c2ti:Dockerfile/$(dockerfile_id)~iri]
+
+  ImageLayerMapping:
+    sources: [['unified_data.json~jsonpath', '$.layers[*]']]
+    s: c2ti:ImageLayer/$(id)
+    po:
+      - [a, c2t:ImageLayer]
+      - [dct:identifier, $(id), xsd:string]
+      - [dpv:size, $(size), xsd:integer]
+
+  ImageLayerRelationMapping:
+    sources: [['unified_data.json~jsonpath', '$.image_layer_relations[*]']]
+    s: c2ti:Image/$(image_identifier)
+    po:
+      - [c2t:hasLayer, c2ti:ImageLayer/$(layer_id)~iri]
+
+  OperatingSystemMapping:
+    sources: [['unified_data.json~jsonpath', '$.os[*]']]
+    s: c2ti:OperatingSystem/$(image_identifier)
+    po:
+      - [a, c2t:OperatingSystem]
+      - [schema:name, $(name), xsd:string]
+      - [schema:hasVersion, $(version), xsd:string]
+
+  PackageVersionMapping:
+    sources: [['unified_data.json~jsonpath', '$.packages[*]']]
+    s: c2ti:PackageVersion/$(purl)~iri
+    po:
+      - [a, c2t:PackageVersion]
+      - [rdfs:label, "$(name) $(version)", xsd:string]
+      - [schema:name, $(name), xsd:string]
+      - [schema:hasVersion, $(version), xsd:string]
+      - [c2t:packageType, $(packageType), xsd:string]
+
+  LayerPackageRelationMapping:
+    sources: [['unified_data.json~jsonpath', '$.packages[*]']]
+    s: c2ti:ImageLayer/$(layer_id)
+    po:
+      - [c2t:hasPackageVersion, c2ti:PackageVersion/$(purl)~iri]
+
+  PackageVulnerabilityRelation:
+    sources: [['unified_data.json~jsonpath', '$.pkg_vuln_relations[*]']]
+    s: c2ti:PackageVersion/$(purl)~iri
+    po:
+      - [c2t:hasVulnerability, c2ti:Vulnerability/$(vuln_id)~iri]
+
+  VulnerabilityMapping:
+    sources: [['unified_data.json~jsonpath', '$.vulnerabilities[*]']]
+    s: c2ti:Vulnerability/$(id)
+    po:
+      - [a, c2t:Vulnerability]
+      - [dct:identifier, $(id), xsd:string]
+      - [rdfs:label, $(id), xsd:string]
+      - [dct:description, $(description), xsd:string]
+      - [c2t:severity, $(severity), xsd:string]
+      - [c2t:hasAffectedPackage, $(hasAffectedPackage), xsd:string]
+
+  HostDeploysContainerMapping:
+    sources: [['unified_data.json~jsonpath', '$.containers[*]']]
+    s: c2ti:Host/$(isDeployedOn)~iri
+    po:
+      - [c2t:deploysContainer, c2ti:Container/$(id)~iri]
+
+  ImageHasInstanceMapping:
+    sources: [['unified_data.json~jsonpath', '$.containers[*]']]
+    s: c2ti:Image/$(isInstanceOf)~iri
+    po:
+      - [c2t:hasInstance, c2ti:Container/$(id)~iri]

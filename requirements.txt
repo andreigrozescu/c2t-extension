@@ -1,0 +1,5 @@
+click
+rdflib
+morph-kgc
+pandas
+pyyaml
