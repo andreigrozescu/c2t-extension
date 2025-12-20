@@ -6,18 +6,21 @@ import rdflib
 from pathlib import Path
 from . import unifier
 
-# Configuration
+# Where mappings are located
 MAPPINGS_DIR = Path(__file__).parent.parent / "mappings"
 
 def sanitize_cli_name(n: str) -> str:
+    """Sanitizes names for filenames."""
     return n.replace(":", "_").replace("/", "_")
 
 def check_dependencies():
+    """Checks if external tools are available."""
     for cmd in ["docker", "syft", "grype"]:
         if not shutil.which(cmd):
             raise EnvironmentError(f"{cmd} not found. Please install it.")
 
 def run_command(command, output_file=None, allow_nonzero=False):
+    """Executes a shell command safely."""
     if "syft" in command or "grype" in command:
         if "-q" not in command: command.append("-q")
     try:
@@ -30,19 +33,26 @@ def run_command(command, output_file=None, allow_nonzero=False):
         if not allow_nonzero: raise
 
 def get_docker_state():
-    """Returns current containers and images from the Docker Host."""
+    """Returns lists of containers and images found on the host."""
     cmd = ["docker", "ps", "-a", "--format", "{{.ID}}\t{{.Image}}\t{{.Names}}\t{{.Status}}"]
     res = subprocess.run(cmd, capture_output=True, text=True, check=True)
     containers = []
-    images = set()
     for line in res.stdout.strip().splitlines():
         if line:
             parts = line.split("\t")
             containers.append({'id': parts[0], 'image': parts[1], 'name': parts[2], 'status': parts[3]})
-            images.add(parts[1])
+            
+    cmd_i = ["docker", "images", "--format", "{{.Repository}}:{{.Tag}}"]
+    res_i = subprocess.run(cmd_i, capture_output=True, text=True, check=True)
+    images = set()
+    for line in res_i.stdout.strip().splitlines():
+        if line and "<none>" not in line:
+            images.add(line)
+            
     return containers, sorted(list(images))
 
 def get_analyzed_images(graph_path: Path):
+    """Checks the graph to see what's already there."""
     if not graph_path.exists():
         return set()
     g = rdflib.Graph()
@@ -57,6 +67,7 @@ def get_analyzed_images(graph_path: Path):
         return set()
 
 def process_incremental(output_graph_path: Path, force_rebuild=False):
+    """Main orchestration logic."""
     check_dependencies()
     
     containers, current_images = get_docker_state()
@@ -85,6 +96,7 @@ def process_incremental(output_graph_path: Path, force_rebuild=False):
         for img in images_to_process:
             safe = sanitize_cli_name(img)
             logging.info(f"Processing: {img}")
+            
             run_command(["syft", img, "-o", "json"], temp_dir / f"syft_{safe}.json")
             run_command(["grype", img, "-o", "json"], temp_dir / f"grype_{safe}.json", allow_nonzero=True)
             run_command(["docker", "inspect", img], temp_dir / f"image_inspect_{safe}.json")
@@ -92,7 +104,6 @@ def process_incremental(output_graph_path: Path, force_rebuild=False):
 
         new_graph = unifier.generate_unified_json(temp_dir, containers, images_to_process)
 
-    # Merge with main graph
     main_graph = rdflib.Graph()
     if output_graph_path.exists():
         main_graph.parse(str(output_graph_path), format="nt")

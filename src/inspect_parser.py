@@ -8,6 +8,9 @@ def sanitize(s: str) -> str:
     return s.replace(":", "_").replace("/", "_")
 
 def parse_inspect_file(file_path: str) -> dict | None:
+    """
+    Parses a Docker inspect JSON file to extract relevant fields.
+    """
     try:
         path = Path(file_path)
         with open(path, 'r', encoding='utf-8') as f:
@@ -17,22 +20,27 @@ def parse_inspect_file(file_path: str) -> dict | None:
         
         info = data[0]
         
+        # Container Name
         name = info.get("Name", "").lstrip('/')
         
+        # Image Name
         raw_image = info.get("Config", {}).get("Image", "")
         if not raw_image and "RepoTags" in info and info["RepoTags"]:
              raw_image = info["RepoTags"][0]
         image_sanitized = sanitize(raw_image)
         
+        # Ports
         ports = info.get("NetworkSettings", {}).get("Ports", {})
         if not ports:
             ports = info.get("Config", {}).get("ExposedPorts", {})
         
+        # Creation Date
         created = info.get("Created")
         if not created or created == "null":
              created = info.get("Config", {}).get("Created", "")
         if created is None: created = ""
 
+        # Metadata
         size = info.get("Size", 0)
         arch = info.get("Architecture", "unknown")
         

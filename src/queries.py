@@ -240,16 +240,13 @@ class QueryEngine:
 
     def image_metadata(self):
         q = """
-        SELECT DISTINCT ?imageName ?created ?arch ?dockerfileContent
+        SELECT DISTINCT ?imageName ?created ?arch ?history
         WHERE {
             ?img a c2t:Image ; 
                  rdfs:label ?imageName .
             OPTIONAL { ?img schema:dateCreated ?created }
             OPTIONAL { ?img c2t:architecture ?arch }
-            OPTIONAL {
-                ?img c2t:isBuiltFrom ?df .
-                ?df c2t:content ?dockerfileContent .
-            }
+            OPTIONAL { ?img c2t:hasBuildHistory ?history }
         }
         """
         return self.run_query(q)

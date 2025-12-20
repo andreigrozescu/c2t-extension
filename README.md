@@ -7,7 +7,7 @@
 The application follows a modular pipeline designed to extract, unify, and semantically map data from the Docker environment.
 
 1.  **Orchestration (`src/logic.py`):**
-    The system scans the host for available images and containers. It invokes external CLI tools (`docker inspect`, `docker history`, `syft`, `grype`) to generate raw data files.
+    The system scans the host for available images and containers. It invokes external CLI tools like `docker inspect`, `docker history`, `syft`, and `grype` to generate raw data files.
 
 2.  **Parsing (`src/inspect_parser.py`, `src/syft_parser.py`):**
     The raw outputs are processed to normalize data structures, extract relevant metadata (creation dates, architecture, ports), and clean identifiers.
@@ -23,6 +23,8 @@ The application follows a modular pipeline designed to extract, unify, and seman
 
 ## System Requirements
 
+The following tools must be installed on your system and accessible via the terminal (PATH):
+
 *   **Docker:** Required to interact with the daemon.
 *   **Syft:** Required for generating the Software Bill of Materials (SBOM).
     ```bash
@@ -35,11 +37,11 @@ The application follows a modular pipeline designed to extract, unify, and seman
 
 ## Installation
 
-Installation can be done using **Poetry** or a standard Python **virtual environment**.
+Installation can be done using **Poetry** (recommended) or a standard Python **virtual environment**.
 
 ### Option A: Using Poetry
 
-1.  Clone the repositoryand enter the directory:
+1.  Clone the repository and enter the directory:
     ```bash
     git clone https://github.com/andreigrozescu/c2t-extension.git
     cd c2t
@@ -83,31 +85,44 @@ Analyzes the host state and generates the Knowledge Graph.
 ```bash
 c2t process
 ```
-By default, the tool performs an **incremental update**. It scans the Docker Host and compares it against the existing Knowledge Graph. It **only analyzes new images or containers** that are not yet present in the graph. This is the recommended mode for daily usage, as it avoids regenerating the whole graph.
+By default, the tool performs an **incremental update**. It scans the Docker Host and compares it against the existing Knowledge Graph. It **only analyzes new images or containers** that are not yet present in the graph. This is the recommended mode for daily usage.
 
 ```bash
 c2t process --force
 ```
-The `--force` flag completely discards the existing graph and re-analyzes all images and containers currently present on the host. 
+The `--force` flag completely discards the existing graph and re-analyzes all images and containers currently present on the host.
 
 ### 2. List Containers
 Lists all containers found in the graph, including their ID, Status, and mapped Ports.
+
 ```bash
 c2t list
 ```
 
+**Filter active containers:**
+You can use the `--running` flag to filter the output and show only active containers.
+```bash
+c2t list --running
+```
+
 ### 3. Security Assessment
 Performs a security audit on a specific container or image. It displays metadata and a list of package vulnerabilities grouped by severity.
+
 ```bash
 c2t assess <TARGET>
 ```
-**Example:**
+
+**Filter by Severity:**
+Use the `--filter` flag to show only **HIGH** and **CRITICAL** vulnerabilities, removing the noise of low-impact alerts.
 ```bash
-c2t assess nginx:latest
+c2t assess nginx:latest --filter
 ```
 
 ### 4. Image Comparison
-Compares two images side-by-side. It displays a metadata comparison table (OS, Size, Date, Vulnerability Count) and a library comparison table highlighting version differences.
+Compares two images side-by-side. It displays:
+1.  **Main Comparison:** Metadata (OS, Size, Date) and Total Vulnerability count.
+2.  **Libraries Comparison:** A table comparing package versions (Green=Match, Yellow=Version Change, Red=Missing).
+
 ```bash
 c2t diff <IMAGE_1> <IMAGE_2>
 ```
@@ -117,7 +132,7 @@ c2t diff redis:6.2-alpine redis:7.2-alpine
 ```
 
 ### 5. Search Library
-Finds which containers or images contain a specific library installed. Useful for tracking vulnerable dependencies.
+Finds which containers or images contain a specific library installed. Useful for tracking vulnerable dependencies (e.g., Log4j, OpenSSL).
 ```bash
 c2t search-lib <LIBRARY_NAME>
 ```
@@ -136,13 +151,13 @@ c2t search-app <APP_NAME>
 c2t search-app python
 ```
 
-### 7. Metadata
-Retrieves metadata for all images and shows the reconstructed Dockerfile using docker history.
+### 7. Metadata & History
+Retrieves metadata for all images and shows the reconstructed **Build History** (Dockerfile commands) extracted from the image layers.
 ```bash
 c2t metadata
 ```
 
-### 8. Operative System Report
+### 8. Operating System Report
 Generates a summary of the Operating System families detected in the local registry.
 ```bash
 c2t report-os
@@ -153,3 +168,9 @@ Lists all installed packages and versions for a specific image.
 ```bash
 c2t show-libs <IMAGE_NAME>
 ```
+
+## Ontology Model
+
+The following diagram represents the semantic model (Ontology) used to structure the knowledge graph. It defines the relationships between the Host, Containers, Images, Layers, Packages, and Vulnerabilities.
+
+![C2T Ontology Diagram](ontology/ontology.png)

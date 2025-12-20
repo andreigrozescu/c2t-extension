@@ -8,82 +8,83 @@ from pathlib import Path
 from urllib.parse import unquote
 from . import logic, queries
 
+# Configure logging with timestamps
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%H:%M:%S')
 
+# Path to the RDF Knowledge Graph
 OUTPUT_FILE = Path(__file__).parent.parent / "output" / "docker_graph.nt"
 
+# Definition of severity levels for filtering
+SEVERITY_LEVELS = {
+    "CRITICAL": 5,
+    "HIGH": 4,
+    "MEDIUM": 3,
+    "LOW": 2,
+    "NEGLIGIBLE": 1,
+    "UNKNOWN": 0
+}
+
 # --- MAIN CLI GROUP ---
-@click.group(epilog="Run 'c2t COMMAND --help' for detailed usage and examples.")
+@click.group(epilog="Run 'c2t COMMAND --help' for more information on a specific command.")
 def cli():
     """
     \b
-    C2T (Container To Triples) - Extended Edition
-    =============================================
-    A Forensic and Security Auditing tool for Docker environments.
-    
-    This tool extracts data from Docker containers and images, combines it with 
-    Software Bill of Materials (SBOM) and Vulnerability scans, and generates 
-    a Knowledge Graph for semantic analysis.
+    C2T: Tool for Docker Security Auditing and Forensic Traceability.
+    -----------------------------------------------------------------
+    Generates Knowledge Graphs from Docker containers to analyze 
+    vulnerabilities and software composition (SBOM).
     """
     pass
 
 # --- PROCESS COMMAND ---
-@cli.command(short_help="Generates the Knowledge Graph.")
-@click.option('--force', is_flag=True, help="Force full regeneration of the graph, ignoring existing data.")
+@cli.command(short_help="Analyzes host and generates graph.")
+@click.option('--force', is_flag=True, help="Forces full graph regeneration.")
 def process(force):
-    """
-    Analyzes the Docker Host and builds/updates the Knowledge Graph.
-
-    \b
-    Workflow:
-    1. Detects all local Docker containers and images.
-    2. Extracts SBOM (Syft), Vulnerabilities (Grype), and Metadata (Inspect/History).
-    3. Unifies data into a standardized JSON format.
-    4. Transforms JSON to RDF Triples using Morph-KGC mappings.
-
-    \b
-    Examples:
-        c2t process
-        c2t process --force
-    """
+    """Analyzes the current Docker Host state."""
     click.echo(click.style("Starting Docker Host analysis...", fg='green'))
     logic.process_incremental(OUTPUT_FILE, force_rebuild=force)
 
-# --- HELPERS ---
+# --- HELPER FUNCTIONS ---
 
 def get_query_engine():
-    """Initializes the SPARQL Query Engine."""
+    """Initializes the query engine or exits if graph is missing."""
     if not OUTPUT_FILE.exists():
         click.echo(click.style("Error: The graph does not exist. Run 'c2t process' first.", fg='red'))
         sys.exit(1)
     return queries.QueryEngine(OUTPUT_FILE)
 
 def extract_name_from_uri(uri_str):
-    """Extracts clean package name from PURL URI."""
+    """Extracts the package name from a PURL URI."""
     try:
         decoded = unquote(str(uri_str))
         if "pkg:" in decoded:
             purl_part = decoded.split("pkg:")[-1]
-            if "/" in purl_part: name_ver = purl_part.split("/")[-1]
-            else: name_ver = purl_part
+            if "/" in purl_part: 
+                name_ver = purl_part.split("/")[-1]
+            else: 
+                name_ver = purl_part
             return name_ver.split("@")[0]
-    except: pass
+    except: 
+        pass
     return "Unknown Package"
 
 def split_package_version(pkg_name, version):
-    """Splits mixed name/version strings if necessary."""
+    """Splits name and version if they are combined."""
     pkg = str(pkg_name)
     ver = str(version) if version else "unknown"
-    if ver.lower() in ["none", "unknown", "n/a", ""] and " " in pkg:
+    
+    is_invalid_ver = ver.lower() in ["none", "unknown", "n/a", ""]
+    if is_invalid_ver and " " in pkg:
         try:
             parts = pkg.split(" ", 1)
             if len(parts) > 1 and (parts[1][0].isdigit() or parts[1].lower().startswith('v')):
                 return parts[0], parts[1]
-        except: pass
+        except: 
+            pass
     return pkg, ver
 
 def format_ports(ports_str):
-    """Formats Docker port mappings for display."""
+    """Formats the raw ports string from Docker."""
     s = str(ports_str)
     if not s or s == "{}" or "None" in s:
         raw = re.findall(r"(\d+/(?:tcp|udp))", s)
@@ -95,51 +96,63 @@ def format_ports(ports_str):
         if mappings and internal:
             pairs = []
             for i, m in enumerate(mappings):
-                if i < len(internal): pairs.append(f"{m}->{internal[i]}")
+                if i < len(internal): 
+                    pairs.append(f"{m}->{internal[i]}")
             return ", ".join(pairs)
+        
         raw_keys = re.findall(r"['\"](\d+/(?:tcp|udp))['\"]", s)
         if raw_keys: return ", ".join(sorted(set(raw_keys)))
+        
         raw = re.findall(r"(\d+/(?:tcp|udp))", s)
         return ", ".join(sorted(set(raw)))
-    except: return ""
+    except: 
+        return ""
 
 # --- COMMANDS ---
 
 @cli.command(name='list', short_help="Lists deployed containers.")
-def list_containers():
-    """
-    Lists all containers present in the Knowledge Graph.
-    
-    Displays the Host, Container Name, ID, Base Image, Status, and Port Mappings.
-
-    \b
-    Example:
-        c2t list
-    """
+@click.option('--running', is_flag=True, help="Show only running containers.")
+def list_containers(running):
+    """Lists deployed containers."""
     qe = get_query_engine()
     results = qe.list_containers()
     
     total = len(results)
     stats = {"running": 0, "exited": 0, "paused": 0}
+    filtered_results = []
+    
+    # Process results for stats and filtering
     for r in results:
         status_val = getattr(r, 'status', 'unknown')
         s = str(status_val).lower()
+        
+        # Count stats
         if "up" in s or "running" in s: stats["running"] += 1
         elif "exited" in s: stats["exited"] += 1
         else: stats["paused"] += 1
+        
+        # Apply filter 
+        if running:
+            if "up" in s or "running" in s:
+                filtered_results.append(r)
+        else:
+            filtered_results.append(r)
 
     click.echo(click.style(f"\n[CONTAINER SUMMARY]", bold=True))
     click.echo(f"Total: {total} | ", nl=False)
     click.echo(click.style(f"Running: {stats['running']}", fg='green') + " | ", nl=False)
     click.echo(click.style(f"Exited: {stats['exited']}", fg='red') + " | ", nl=False)
     click.echo(click.style(f"Other: {stats['paused']}", fg='yellow'))
-    click.echo("")
+    
+    if running:
+        click.echo(click.style("Filter active: Showing only running containers.", fg='cyan'))
 
+    click.echo("")
     header = f"{'HOST':<12} {'CONTAINER NAME':<25} {'ID':<14} {'IMAGE':<30} {'STATUS':<12} {'PORTS'}"
     click.echo(header)
     click.echo("-" * 120)
     
-    for row in results:
+    for row in filtered_results:
         host = str(getattr(row, 'hostName', 'local'))
         n_val = getattr(row, 'name', 'n/a')
         id_val = getattr(row, 'id', 'n/a')
@@ -157,32 +170,22 @@ def list_containers():
 
 @cli.command(short_help="Audits security (Containers OR Images).")
 @click.argument('target')
-def assess(target):
-    """
-    Performs a security assessment on a specific Target (Container Name or Image Name).
-
-    Displays metadata (OS, Architecture, Size) and a list of known vulnerabilities (CVEs)
-    linked to the software packages installed in the target.
-
-    \b
-    Arguments:
-        TARGET: Name of the container or image to assess.
-
-    \b
-    Examples:
-        c2t assess nginx:latest
-        c2t assess my-web-container
-    """
+@click.option('--filter', is_flag=True, help="Show only HIGH and CRITICAL vulnerabilities.")
+def assess(target, filter):
+    """Evaluates vulnerabilities."""
     qe = get_query_engine()
     
+    # 1. Metadata
     meta_res = qe.get_target_metadata(target)
     arch, size, created, os_str = "Unknown", "Unknown", "Unknown", "Unknown"
+    
     for row in meta_res:
         a = getattr(row, 'arch', None)
         s = getattr(row, 'size', None)
         c = getattr(row, 'created', None)
         on = getattr(row, 'osName', None)
         ov = getattr(row, 'osVer', None)
+
         if a: arch = str(a)
         if s: size = str(s)
         if c: created = str(c)
@@ -190,6 +193,7 @@ def assess(target):
             os_str = str(on)
             if ov: os_str += f" {ov}"
     
+    # 2. Stats
     count_res = qe.get_total_package_count(target)
     total_pkgs = 0
     for row in count_res:
@@ -205,6 +209,7 @@ def assess(target):
     click.echo(f"Total Packages: {total_pkgs}")
     click.echo("")
 
+    # 3. Vulnerabilities
     raw_results = qe.assess_target(target)
     results = [row for row in raw_results]
     
@@ -212,12 +217,26 @@ def assess(target):
         click.echo(f"No vulnerabilities found for '{target}' (or target not in graph).")
         return
 
+    # Filter logic
+    final_results = []
     counts = {'Critical': 0, 'High': 0, 'Medium': 0, 'Low': 0, 'Negligible': 0, 'Unknown': 0}
-    for row in results:
-        sev = str(getattr(row, 'severity', 'Unknown')).capitalize()
-        if sev not in counts: sev = 'Unknown'
-        counts[sev] += 1
     
+    for row in results:
+        sev_raw = str(getattr(row, 'severity', 'Unknown'))
+        sev_str = sev_raw.capitalize()
+        
+        if sev_str not in counts: sev_str = 'Unknown'
+        counts[sev_str] += 1
+        
+        # Apply filter
+        if filter:
+            score = SEVERITY_LEVELS.get(sev_raw.upper(), 0)
+            # High and Critical
+            if score >= 4:
+                final_results.append(row)
+        else:
+            final_results.append(row)
+
     total_vulns = len(results)
     summary_parts = []
     for s in ['Critical', 'High', 'Medium', 'Low', 'Negligible', 'Unknown']:
@@ -226,85 +245,62 @@ def assess(target):
             summary_parts.append(click.style(f"{s}: {counts[s]}", fg=c))
     
     click.echo(f"Vulnerabilities ({total_vulns}): " + " | ".join(summary_parts))
+    
+    if filter:
+        click.echo(click.style("Filter active: Showing HIGH and CRITICAL only.", fg='cyan'))
+    
     click.echo("")
     click.echo(f"{'SEVERITY':<12} {'PKG NAME':<35} {'VULN ID':<20}")
     click.echo("-" * 70)
-    for row in results:
+    
+    for row in final_results:
         sev = str(getattr(row, 'severity', 'Unknown'))
         vuln = str(getattr(row, 'vulnID', ''))
         raw_pkg = str(getattr(row, 'pkgName', 'Unknown'))
         pkg_uri = getattr(row, 'pkgURI', '')
-        if raw_pkg == "Unknown" and pkg_uri: pkg = extract_name_from_uri(pkg_uri)
-        else: pkg, _ = split_package_version(raw_pkg, "unknown")
+
+        if raw_pkg == "Unknown" and pkg_uri:
+            pkg = extract_name_from_uri(pkg_uri)
+        else:
+            pkg, _ = split_package_version(raw_pkg, "unknown")
+        
         color = 'white'
         if sev == 'Critical': color = 'red'
         elif sev == 'High': color = 'magenta' 
         elif sev == 'Medium': color = 'yellow' 
+        
         click.echo(click.style(f"{sev:<12}", fg=color) + f"{pkg:<35} {vuln:<20}")
 
 @cli.command(short_help="Compares libraries between images.")
 @click.argument('img1')
 @click.argument('img2')
 def diff(img1, img2):
-    """
-    Compares two images to identify differences in metadata and software libraries.
-    
-    Useful for checking what changed between version updates (e.g., redis:6 vs redis:7).
-    
-    \b
-    Outputs two tables:
-    1. MAIN COMPARISON: Architecture, OS, Size, Creation Date, Vulnerability Count.
-    2. LIBRARIES COMPARISON: Side-by-side version check.
-       - Green: Version Match.
-       - Yellow: Version Mismatch.
-       - Red: Library missing in one image.
-
-    \b
-    Arguments:
-        IMG1: Base image (e.g., alpine:3.14)
-        IMG2: Target image (e.g., alpine:latest)
-
-    \b
-    Example:
-        c2t diff redis:6.2-alpine redis:7.2-alpine
-    """
+    """Compares two images (Metadata + Unified Library Table)."""
     try:
-        qe = get_qe()
+        qe = get_query_engine()
         
         # --- 1. METADATA ---
-        m1 = {"arch": "?", "size": "?", "os": "?", "created": "?", "vulns": "0"}
-        res1 = qe.get_image_metadata(img1)
-        for r in res1:
-            if getattr(r, 'arch', None): m1["arch"] = str(r.arch)
-            if getattr(r, 'size', None): m1["size"] = str(r.size)
-            if getattr(r, 'created', None): m1["created"] = str(r.created)
-            on = getattr(r, 'osName', None)
-            ov = getattr(r, 'osVer', None)
-            if on:
-                val = str(on)
-                if ov: val += " " + str(ov)
-                m1["os"] = val.strip()
-        
-        m2 = {"arch": "?", "size": "?", "os": "?", "created": "?", "vulns": "0"}
-        res2 = qe.get_image_metadata(img2)
-        for r in res2:
-            if getattr(r, 'arch', None): m2["arch"] = str(r.arch)
-            if getattr(r, 'size', None): m2["size"] = str(r.size)
-            if getattr(r, 'created', None): m2["created"] = str(r.created)
-            on = getattr(r, 'osName', None)
-            if on:
-                val = str(on)
-                ov = getattr(r, 'osVer', None)
-                if ov: val += " " + str(ov)
-                m2["os"] = val.strip()
+        def get_meta(img_name):
+            d = {"arch": "Unknown", "size": "Unknown", "os": "Unknown", "created": "Unknown", "vulns": "0"}
+            res = qe.get_image_metadata(img_name)
+            for row in res:
+                if getattr(row, 'arch', None): d["arch"] = str(row.arch)
+                if getattr(row, 'size', None): d["size"] = str(row.size)
+                if getattr(row, 'created', None): d["created"] = str(row.created)
+                on = getattr(row, 'osName', None)
+                ov = getattr(row, 'osVer', None)
+                if on:
+                    val = str(on)
+                    if ov: val += " " + str(ov)
+                    d["os"] = val.strip()
+            
+            v_res = qe.get_image_vuln_count(img_name)
+            for row in v_res:
+                if getattr(row, 'vCount', None): d["vulns"] = str(row.vCount)
+            return d
 
-        v1 = qe.get_image_vuln_count(img1)
-        for r in v1: 
-            if getattr(r, 'vCount', None): m1["vulns"] = str(r.vCount)
-        
-        v2 = qe.get_image_vuln_count(img2)
-        for r in v2: 
-            if getattr(r, 'vCount', None): m2["vulns"] = str(r.vCount)
+        m1 = get_meta(img1)
+        m2 = get_meta(img2)
 
         click.echo(click.style(f"\n[MAIN COMPARISON]", bold=True))
         click.echo(f"{'tags':<15} {img1:<40} {img2:<40}")
@@ -348,6 +344,8 @@ def diff(img1, img2):
             ver1 = p1.get(lib)
             ver2 = p2.get(lib)
 
+            # colors
+            # V1
             if ver1 is None:
                 txt1 = click.style("None", fg='red')
                 len1 = 4
@@ -356,6 +354,7 @@ def diff(img1, img2):
                 txt1 = click.style(ver1, fg=c)
                 len1 = len(ver1)
 
+            # V2
             if ver2 is None:
                 txt2 = click.style("None", fg='red')
             else:
@@ -367,6 +366,7 @@ def diff(img1, img2):
             pad1 = col2_w - len1
             if pad1 < 1: pad1 = 1
             click.echo(txt1 + (" " * pad1), nl=False)
+            
             click.echo(txt2)
 
         click.echo("")
@@ -379,16 +379,8 @@ def diff(img1, img2):
 @cli.command(short_help="Finds containers affected by a library.")
 @click.argument('lib')
 def search_lib(lib):
-    """
-    Search for a library/package across all analyzed containers/images.
-    
-    Useful for checking if a vulnerable library (e.g., 'log4j') is present anywhere in your infrastructure.
-
-    \b
-    Example:
-        c2t search-lib openssl
-    """
-    qe = get_qe()
+    """Finds which deployed containers depend on a specific library."""
+    qe = get_query_engine()
     results = qe.affected_containers_by_lib(lib)
     if not results:
         click.echo(f"No containers found using library: '{lib}'")
@@ -412,15 +404,8 @@ def search_lib(lib):
 @cli.command(short_help="Finds images containing an app.")
 @click.argument('app')
 def search_app(app):
-    """
-    Reverse search: Finds which images contain a specific Application/Package.
-
-    \b
-    Example:
-        c2t search-app nginx
-        c2t search-app python
-    """
-    qe = get_qe()
+    """Finds which images contain a specific application installed."""
+    qe = get_query_engine()
     results = qe.images_with_app(app)
     if not results:
         click.echo(f"No images found containing application: '{app}'")
@@ -441,15 +426,8 @@ def search_app(app):
 @cli.command(short_help="Shows image SBOM.")
 @click.argument('image')
 def show_libs(image):
-    """
-    Displays the full Software Bill of Materials (SBOM) for a given image.
-    Lists every package version installed.
-
-    \b
-    Example:
-        c2t show-libs alpine:3.14
-    """
-    qe = get_qe()
+    """Lists all libraries (SBOM) in a specific image."""
+    qe = get_query_engine()
     results = qe.image_libraries(image)
     click.echo(click.style(f"\n[SBOM SUMMARY] Image: {image}", bold=True))
     click.echo(f"Total Packages Installed: {len(results)}")
@@ -465,11 +443,8 @@ def show_libs(image):
 
 @cli.command(short_help="Operating Systems report.")
 def report_os():
-    """
-    Generates a report of all Operating System families detected
-    across the analyzed images (e.g., Alpine, Debian).
-    """
-    qe = get_qe()
+    """Lists the Operating System families detected in the images."""
+    qe = get_query_engine()
     results = qe.images_os()
     distros = set(str(getattr(row, 'osName', 'Unknown')) for row in results)
     click.echo(click.style(f"\n[OS REPORT SUMMARY]", bold=True))
@@ -485,7 +460,7 @@ def report_os():
 @cli.command(short_help="Shows image metadata.")
 def metadata():
     """
-    Retrieves detailed metadata for all images in the graph.
+    Shows detailed metadata for all images in the graph.
     Includes Creation Date, Architecture, and the reconstructed Dockerfile.
     """
     qe = get_query_engine()
@@ -501,11 +476,12 @@ def metadata():
         click.echo(f"IMAGE:   {img}")
         click.echo(f"CREATED: {created}")
         click.echo(f"ARCH:    {arch}")
-        df = getattr(row, 'dockerfileContent', None)
-        if df:
+        
+        h = getattr(row, 'history', None)
+        if h:
             click.echo("-" * 20)
-            click.echo("DOCKERFILE:")
-            click.echo(str(df).replace('\\n', '\n'))
+            click.echo("BUILD HISTORY:")
+            click.echo(str(h).replace('\\n', '\n'))
 
 if __name__ == '__main__':
     cli()

@@ -11,41 +11,39 @@ import rdflib
 MAPPINGS_DIR = Path(__file__).parent.parent / "mappings"
 
 def sanitize(s: str) -> str:
+    """Make strings URI-safe."""
     if s is None: return ""
     return str(s).replace(":", "_").replace("/", "_")
 
 def clean_rdf_string(s: str) -> str:
+    """Escape special characters for RDF."""
     return str(s).replace('"', "'").replace("\\", "\\\\").replace("\n", "\\n").replace("\t", " ")
 
-def process_docker_history(history_path: Path, image_safe_name: str) -> dict:
+def process_docker_history(history_path: Path) -> str:
+    """
+    Reconstructs the build history as a single string property.
+    """
     if not history_path.exists():
-        return {"full_content": "", "steps": []}
-    steps = []
+        return ""
     commands = []
     try:
         with open(history_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-        for index, line in enumerate(reversed(lines)):
+        for line in reversed(lines):
             cmd = line.strip()
             if not cmd: continue
             clean_cmd = cmd.replace("/bin/sh -c #(nop) ", "").replace("/bin/sh -c ", "RUN ")
-            steps.append({
-                "step_id": f"step_{image_safe_name}_{index+1}",
-                "order": index + 1,
-                "instruction": clean_rdf_string(clean_cmd),
-                "image_identifier": image_safe_name
-            })
             commands.append(clean_cmd)
+        
         full_content = "\n".join(commands)
-        return {"full_content": clean_rdf_string(full_content), "steps": steps}
-    except Exception as e:
-        return {"full_content": "", "steps": []}
+        return clean_rdf_string(full_content)
+    except Exception:
+        return ""
 
-def generate_unified_json(temp_dir: Path, containers_data: list, images_to_analyze: list) -> dict:
+def generate_unified_json(temp_dir: Path, containers_data: list, images_to_analyze: list) -> rdflib.Graph:
     unified_data = {
         "host": [], "containers": [], "images": [], "layers": [],
-        "image_layer_relations": [], "dockerfiles": [], "dockerfile_steps": [],
-        "os": [], "packages": [], "vulnerabilities": [], "pkg_vuln_relations": [] 
+        "image_layer_relations": [], "os": [], "packages": [], "vulnerabilities": [], "pkg_vuln_relations": [] 
     }
 
     hostname = socket.gethostname().strip()
@@ -78,8 +76,8 @@ def generate_unified_json(temp_dir: Path, containers_data: list, images_to_analy
         arch = "unknown"
         size = 0
         
+        # Image Metadata
         inspect_file_path = temp_dir / f"image_inspect_{safe_name}.json"
-        
         if inspect_file_path.exists():
             parsed_img = inspect_parser.parse_inspect_file(str(inspect_file_path))
             if parsed_img:
@@ -94,28 +92,22 @@ def generate_unified_json(temp_dir: Path, containers_data: list, images_to_analy
                     image_layers_ids = [sanitize(l) for l in raw_layers]
             except: pass
 
-        if not created or created.lower() == "none": created = ""
+        if not created or created.lower() == "none": created = "Unknown"
         
+        # Process History
+        history_file = temp_dir / f"history_{safe_name}.txt"
+        history_content = process_docker_history(history_file)
+
         unified_data["images"].append({
             "identifier": safe_name, 
             "raw_identifier": image_name,
             "architecture": arch, 
             "created": created,
-            "size": size
+            "size": size,
+            "history": history_content
         })
 
-        history_file = temp_dir / f"history_{safe_name}.txt"
-        processed_history = process_docker_history(history_file, safe_name)
-        dockerfile_id = f"dockerfile_{safe_name}"
-        unified_data["dockerfiles"].append({
-            "id": dockerfile_id, "image_identifier": safe_name,
-            "label": f"Dockerfile for {image_name}",
-            "content": processed_history["full_content"]
-        })
-        for step in processed_history["steps"]:
-            step["dockerfile_id"] = dockerfile_id
-            unified_data["dockerfile_steps"].append(step)
-
+        # Layer Relations
         for layer_id in image_layers_ids:
             unified_data["image_layer_relations"].append({
                 "image_identifier": safe_name, "layer_id": layer_id
@@ -123,9 +115,9 @@ def generate_unified_json(temp_dir: Path, containers_data: list, images_to_analy
             if not any(l['id'] == layer_id for l in unified_data["layers"]):
                  unified_data["layers"].append({"id": layer_id, "size": 0})
 
+        # Syft / Grype
         syft_file = temp_dir / f"syft_{safe_name}.json"
         grype_file = temp_dir / f"grype_{safe_name}.json"
-
         artifacts = syft_parser.parse_image_artifacts(str(syft_file), str(grype_file), image_name)
 
         if artifacts.get("os"): 

@@ -14,7 +14,7 @@
     dct:title "Extended Containers To Triples Ontology"@en ;
     dct:description "Extended ontology for modelling Docker images, containers, hosts and vulnerabilities."@en ;
     dct:license <https://opensource.org/licenses/Apache-2.0> ;
-    dct:created "2025-12-17"^^xsd:date .
+    dct:created "2025-12-20"^^xsd:date .
 
 #################################################################
 #    Annotation Properties
@@ -29,21 +29,6 @@ dct:created rdf:type owl:AnnotationProperty .
 #################################################################
 #    Object Properties
 #################################################################
-
-c2t:buildsImage rdf:type owl:ObjectProperty ;
-    rdfs:domain c2t:Dockerfile ;
-    rdfs:range c2t:Image ;
-    rdfs:label "buildsImage"@en ;
-    rdfs:comment "A Dockerfile contains instructions to build a Docker Image."@en ;
-    rdfs:isDefinedBy <https://w3id.org/c2t/o#buildsImage> ;
-    owl:inverseOf c2t:isBuiltFrom .
-
-c2t:isBuiltFrom rdf:type owl:ObjectProperty ;
-    rdfs:domain c2t:Image ;
-    rdfs:range c2t:Dockerfile ;
-    rdfs:label "isBuiltFrom"@en ;
-    rdfs:comment "Indicates the Dockerfile used to build this Image."@en ;
-    rdfs:isDefinedBy <https://w3id.org/c2t/o#isBuiltFrom> .
 
 c2t:hasLayer rdf:type owl:ObjectProperty ;
     rdfs:domain c2t:Image ;
@@ -109,11 +94,6 @@ c2t:distributionOf rdf:type owl:ObjectProperty ;
     rdfs:label "distributionOf"@en ;
     rdfs:comment "Links a specific operating system version/distro to its parent distribution family."@en ;
     rdfs:isDefinedBy <https://w3id.org/c2t/o#distributionOf> .
-
-c2t:partOfDockerfile rdf:type owl:ObjectProperty ;
-    rdfs:domain c2t:DockerfileStep ;
-    rdfs:range c2t:Dockerfile ;
-    rdfs:label "partOfDockerfile"@en .
 
 #################################################################
 #    Data Properties
@@ -223,41 +203,16 @@ c2t:vulnerabilityType rdf:type owl:DatatypeProperty ;
     rdfs:comment "The category or type of the vulnerability (e.g., SQL Injection, Buffer Overflow)."@en ;
     rdfs:isDefinedBy <https://w3id.org/c2t/o#vulnerabilityType> .
 
-### c2t:content
-c2t:content rdf:type owl:DatatypeProperty ;
-    rdfs:domain c2t:Dockerfile ;
+c2t:hasBuildHistory rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:Image ;
     rdfs:range xsd:string ;
-    rdfs:label "content"@en ;
-    rdfs:comment "The reconstructed text instructions of the Dockerfile."@en ;
-    rdfs:isDefinedBy <https://w3id.org/c2t/o#content> .
-
-### c2t:stepOrder
-c2t:stepOrder rdf:type owl:DatatypeProperty ;
-    rdfs:domain c2t:DockerfileStep ;
-    rdfs:range xsd:integer ;
-    rdfs:label "stepOrder"@en ;
-    rdfs:comment "The chronological order of the instruction in the Dockerfile."@en .
-
-### c2t:instruction
-c2t:instruction rdf:type owl:DatatypeProperty ;
-    rdfs:domain c2t:DockerfileStep ;
-    rdfs:range xsd:string ;
-    rdfs:label "instruction"@en ;
-    rdfs:comment "The actual text of the instruction (e.g., 'RUN apt-get update')."@en .
+    rdfs:label "hasBuildHistory"@en ;
+    rdfs:comment "The reconstructed build history (Dockerfile instructions) of the image."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#hasBuildHistory> .
 
 #################################################################
 #    Classes
 #################################################################
-
-c2t:Dockerfile rdf:type owl:Class ;
-    owl:equivalentClass dpv:Dockerfile ;
-    rdfs:label "Dockerfile"@en ;
-    rdfs:comment "A text document that contains all the commands a user could call on the command line to assemble an image."@en ;
-    rdfs:isDefinedBy <https://w3id.org/c2t/o#Dockerfile> .
-
-c2t:DockerfileStep rdf:type owl:Class ;
-    rdfs:label "DockerfileStep"@en ;
-    rdfs:comment "A single instruction line within a Dockerfile."@en .
 
 c2t:Image rdf:type owl:Class ;
     owl:equivalentClass dpv:SoftwareImage ;

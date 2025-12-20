@@ -9,11 +9,16 @@ def sanitize(s: str) -> str:
     return str(s).replace(":", "_").replace("/", "_")
 
 def clean_purl(purl: str) -> str:
+    """Removes query params from PURL."""
     if not purl: return ""
     base_purl = purl.split('?')[0]
     return unquote(base_purl)
 
 def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str) -> dict:
+    """
+    Reads Syft and Grype JSON outputs.
+    Extracts OS, Packages, Layers, and Vulnerabilities.
+    """
     os_info, packages, layers = None, [], []
     syft_file = Path(syft_path)
     grype_file = Path(grype_path)

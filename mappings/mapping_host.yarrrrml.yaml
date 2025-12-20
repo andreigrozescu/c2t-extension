@@ -41,41 +41,8 @@ mappings:
       - [c2t:architecture, $(architecture), xsd:string]
       - [dpv:size, $(size), xsd:integer]
       - [schema:dateCreated, $(created), xsd:string]
+      - [c2t:hasBuildHistory, $(history), xsd:string]
       - [c2t:hasOperatingSystem, c2ti:OperatingSystem/$(identifier)~iri]
-      - [c2t:isBuiltFrom, c2ti:Dockerfile/dockerfile_$(identifier)~iri]
-
-  DockerfileMapping:
-    sources: [['unified_data.json~jsonpath', '$.dockerfiles[*]']]
-    s: c2ti:Dockerfile/$(id)
-    po:
-      - [a, c2t:Dockerfile]
-      - [dct:identifier, $(id), xsd:string]
-      - [rdfs:label, $(label), xsd:string]
-      - [c2t:content, $(content), xsd:string]
-      - [c2t:buildsImage, c2ti:Image/$(image_identifier)~iri]
-
-  DockerfileStepsMapping:
-    sources: [['unified_data.json~jsonpath', '$.dockerfile_steps[*]']]
-    s: c2ti:DockerfileStep/$(step_id)
-    po:
-      - [a, c2t:DockerfileStep]
-      - [c2t:stepOrder, $(order), xsd:integer]
-      - [c2t:instruction, $(instruction), xsd:string]
-      - [c2t:partOfDockerfile, c2ti:Dockerfile/$(dockerfile_id)~iri]
-
-  ImageLayerMapping:
-    sources: [['unified_data.json~jsonpath', '$.layers[*]']]
-    s: c2ti:ImageLayer/$(id)
-    po:
-      - [a, c2t:ImageLayer]
-      - [dct:identifier, $(id), xsd:string]
-      - [dpv:size, $(size), xsd:integer]
-
-  ImageLayerRelationMapping:
-    sources: [['unified_data.json~jsonpath', '$.image_layer_relations[*]']]
-    s: c2ti:Image/$(image_identifier)
-    po:
-      - [c2t:hasLayer, c2ti:ImageLayer/$(layer_id)~iri]
 
   OperatingSystemMapping:
     sources: [['unified_data.json~jsonpath', '$.os[*]']]
@@ -129,3 +96,16 @@ mappings:
     s: c2ti:Image/$(isInstanceOf)~iri
     po:
       - [c2t:hasInstance, c2ti:Container/$(id)~iri]
+
+  ImageLayerMapping:
+    sources: [['unified_data.json~jsonpath', '$.layers[*]']]
+    s: c2ti:ImageLayer/$(id)
+    po:
+      - [a, c2t:ImageLayer]
+      - [dpv:size, $(size), xsd:integer]
+
+  ImageLayerRelationMapping:
+    sources: [['unified_data.json~jsonpath', '$.image_layer_relations[*]']]
+    s: c2ti:Image/$(image_identifier)
+    po:
+      - [c2t:hasLayer, c2ti:ImageLayer/$(layer_id)~iri]
