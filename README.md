@@ -105,7 +105,7 @@ You can use the `--running` flag to filter the output and show only active conta
 c2t list --running
 ```
 
-### 3. Security Assessment
+### 3. Vulnerabilities
 Performs a security audit on a specific container or image. It displays metadata and a list of package vulnerabilities grouped by severity.
 
 ```bash
@@ -173,4 +173,4 @@ c2t show-libs <IMAGE_NAME>
 
 The following diagram represents the semantic model (Ontology) used to structure the knowledge graph. It defines the relationships between the Host, Containers, Images, Layers, Packages, and Vulnerabilities.
 
-![C2T Ontology Diagram](ontology/ontology.png)
+![C2T Ontology Diagram](ontology/ontology.jpg)
