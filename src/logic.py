@@ -6,7 +6,6 @@ import rdflib
 from pathlib import Path
 from . import unifier
 
-# Where mappings are located
 MAPPINGS_DIR = Path(__file__).parent.parent / "mappings"
 
 def sanitize_cli_name(n: str) -> str:

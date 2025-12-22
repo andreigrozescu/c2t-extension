@@ -37,7 +37,7 @@ The following tools must be installed on your system and accessible via the term
 
 ## Installation
 
-Installation can be done using **Poetry** (recommended) or a standard Python **virtual environment**.
+Installation can be done using **Poetry** or a standard Python **virtual environment**.
 
 ### Option A: Using Poetry
 
@@ -99,13 +99,13 @@ Lists all containers found in the graph, including their ID, Status, and mapped 
 c2t list
 ```
 
-**Filter active containers:**
+**Filter Active Containers:**
 You can use the `--running` flag to filter the output and show only active containers.
 ```bash
 c2t list --running
 ```
 
-### 3. Vulnerabilities
+### 3. Assess Vulnerabilities
 Performs a security audit on a specific container or image. It displays metadata and a list of package vulnerabilities grouped by severity.
 
 ```bash
@@ -118,7 +118,18 @@ Use the `--filter` flag to show only **HIGH** and **CRITICAL** vulnerabilities, 
 c2t assess nginx:latest --filter
 ```
 
-### 4. Image Comparison
+### 4. Vulnerability Details
+Shows comprehensive information about a specific vulnerability ID, including CVSS score, vector, and description.
+
+```bash
+c2t vuln <CVE_ID>
+```
+**Example:**
+```bash
+c2t vuln CVE-2021-44228
+```
+
+### 5. Image Comparison (Diff)
 Compares two images side-by-side. It displays:
 1.  **Main Comparison:** Metadata (OS, Size, Date) and Total Vulnerability count.
 2.  **Libraries Comparison:** A table comparing package versions (Green=Match, Yellow=Version Change, Red=Missing).
@@ -131,39 +142,41 @@ c2t diff <IMAGE_1> <IMAGE_2>
 c2t diff redis:6.2-alpine redis:7.2-alpine
 ```
 
-### 5. Search Library
-Finds which containers or images contain a specific library installed. Useful for tracking vulnerable dependencies (e.g., Log4j, OpenSSL).
+### 6. Impact Analysis (Containers)
+Finds which **deployed containers** depend on a specific package. Useful for incident response (e.g., checking if `openssl` is running in production).
+
 ```bash
-c2t search-lib <LIBRARY_NAME>
+c2t containers-with <PACKAGE_NAME>
 ```
 **Example:**
 ```bash
-c2t search-lib openssl
+c2t containers-with openssl
 ```
 
-### 6. Search Application
-Reverse search to find which images contain a specific application software.
+### 7. Inventory Search (Images)
+Finds which **images** in the local catalog contain a specific package. Useful for inventory management.
+
 ```bash
-c2t search-app <APP_NAME>
+c2t images-with <PACKAGE_NAME>
 ```
 **Example:**
 ```bash
-c2t search-app python
+c2t images-with python
 ```
 
-### 7. Metadata & History
+### 8. Metadata
 Retrieves metadata for all images and shows the reconstructed **Build History** (Dockerfile commands) extracted from the image layers.
 ```bash
 c2t metadata
 ```
 
-### 8. Operating System Report
+### 9. Operating System Report
 Generates a summary of the Operating System families detected in the local registry.
 ```bash
 c2t report-os
 ```
 
-### 9. Show SBOM
+### 10. Show SBOM
 Lists all installed packages and versions for a specific image.
 ```bash
 c2t show-libs <IMAGE_NAME>
@@ -173,4 +186,4 @@ c2t show-libs <IMAGE_NAME>
 
 The following diagram represents the semantic model (Ontology) used to structure the knowledge graph. It defines the relationships between the Host, Containers, Images, Layers, Packages, and Vulnerabilities.
 
-![C2T Ontology Diagram](ontology/ontology.jpg)
+![C2T Ontology Diagram](ontology/ontology.png)

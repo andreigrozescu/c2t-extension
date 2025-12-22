@@ -22,11 +22,15 @@ def parse_inspect_file(file_path: str) -> dict | None:
         
         # Container Name
         name = info.get("Name", "").lstrip('/')
+        raw_image = info.get("Config", {}).get("Image", "")
         
         # Image Name
-        raw_image = info.get("Config", {}).get("Image", "")
-        if not raw_image and "RepoTags" in info and info["RepoTags"]:
+        if raw_image and ":" not in raw_image and not raw_image.startswith("sha256:"):
+            raw_image += ":latest"
+            
+        if raw_image.startswith("sha256:") and "RepoTags" in info and info["RepoTags"]:
              raw_image = info["RepoTags"][0]
+
         image_sanitized = sanitize(raw_image)
         
         # Ports

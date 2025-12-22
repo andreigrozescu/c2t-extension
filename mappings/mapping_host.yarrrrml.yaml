@@ -83,6 +83,9 @@ mappings:
       - [rdfs:label, $(id), xsd:string]
       - [dct:description, $(description), xsd:string]
       - [c2t:severity, $(severity), xsd:string]
+      - [c2t:score, $(score), xsd:float]
+      - [c2t:fixedIn, $(fixedIn), xsd:string]
+      - [c2t:vulnerabilityType, $(type), xsd:string]
       - [c2t:hasAffectedPackage, $(hasAffectedPackage), xsd:string]
 
   HostDeploysContainerMapping:

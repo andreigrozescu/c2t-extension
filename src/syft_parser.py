@@ -14,10 +14,38 @@ def clean_purl(purl: str) -> str:
     base_purl = purl.split('?')[0]
     return unquote(base_purl)
 
+def extract_cvss(vuln_obj):
+    """
+    Helper to extract the best CVSS Score and Vector from a vulnerability object.
+    Prioritizes CVSS v3 over v2.
+    """
+    score = 0.0
+    vector = ""
+    cvss_list = vuln_obj.get('cvss', [])
+    
+    if cvss_list:
+        selected = cvss_list[0]
+        for cv in cvss_list:
+            if cv.get('version', '').startswith('3'):
+                selected = cv
+                break
+        
+        metrics = selected.get('metrics', {})
+        # Score
+        val = metrics.get('baseScore')
+        if val: 
+            try: score = float(val)
+            except: pass
+        
+        # Vector
+        vector = metrics.get('vectorString') or metrics.get('vector') or ""
+        
+    return score, vector
+
 def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str) -> dict:
     """
     Reads Syft and Grype JSON outputs.
-    Extracts OS, Packages, Layers, and Vulnerabilities.
+    Extracts OS, Packages, Layers, and Vulnerabilities with robust fallback logic.
     """
     os_info, packages, layers = None, [], []
     syft_file = Path(syft_path)
@@ -31,7 +59,6 @@ def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str
         syft_data = {}
 
     if syft_data:
-        # Distro
         distro = syft_data.get('distro') or syft_data.get('source', {}).get('metadata', {}).get('distro')
         if distro:
             name = distro.get('name', '') if isinstance(distro, dict) else str(distro)
@@ -48,7 +75,6 @@ def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str
                 "image_identifier": sanitize(image_identifier)
             }
 
-        # Layers
         source_meta = syft_data.get('source', {}).get('metadata', {})
         raw_layers = source_meta.get('layers', [])
         for l in raw_layers:
@@ -61,7 +87,6 @@ def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str
                     "image_identifier": sanitize(image_identifier)
                 })
 
-        # Packages
         if syft_data.get('artifacts'):
             for artifact in syft_data['artifacts']:
                 raw_purl = artifact.get('purl') or artifact.get('id') or ""
@@ -109,12 +134,44 @@ def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str
                 vid = vuln.get('id')
                 severity = vuln.get('severity', 'Unknown')
                 description = vuln.get('description', '')
+                cvss_score, cvss_vector = extract_cvss(vuln)
+                
+                if not description or not cvss_vector:
+                    relateds = vuln.get('relatedVulnerabilities', [])
+                    for rel in relateds:
+                        if not description and rel.get('description'):
+                            description = rel.get('description')
+                        
+                        if not cvss_vector:
+                            r_score, r_vector = extract_cvss(rel)
+                            if r_vector:
+                                cvss_vector = r_vector
+                                if cvss_score == 0.0: cvss_score = r_score
+                        
+                        if description and cvss_vector:
+                            break
+
+                if not description and vuln.get('detail'):
+                     description = vuln.get('detail')
+                
+                # Fields
+                fixed_in = ""
+                if vuln.get('fix'):
+                    versions = vuln.get('fix', {}).get('versions', [])
+                    if versions: fixed_in = versions[0]
+                    else: fixed_in = vuln.get('fixedInVersion', "")
+                
+                namespace = vuln.get('namespace', 'unknown')
                 
                 if vid and clean:
                     vulnerabilities.append({
                         "id": vid,
                         "severity": severity.capitalize(),
                         "description": str(description).replace('\n', ' ').replace('"', "'"),
+                        "fixedIn": fixed_in,
+                        "score": cvss_score,
+                        "vector": cvss_vector, 
+                        "type": namespace,
                         "hasAffectedPackage": clean,
                         "image_identifier": sanitize(image_identifier)
                     })
