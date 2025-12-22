@@ -2,7 +2,7 @@ import rdflib
 import logging
 from pathlib import Path
 
-# Common Prefixes
+# Common SPARQL Prefixes used in all queries
 PREFIXES = """
     PREFIX c2t: <https://w3id.org/c2t/o#>
     PREFIX c2ti: <https://w3id.org/c2t/instance/>
@@ -14,6 +14,8 @@ PREFIXES = """
 """
 
 class QueryEngine:
+    """Encapsulates SPARQL queries logic against the RDF graph."""
+    
     def __init__(self, graph_path: Path):
         self.graph_path = graph_path
         self.g = rdflib.Graph()
@@ -25,14 +27,12 @@ class QueryEngine:
             logging.warning("No graph found. Run 'c2t process' first.")
 
     def run_query(self, query_body):
+        """Executes a query with standard prefixes prepended."""
         full_query = PREFIXES + query_body
         return self.g.query(full_query)
 
-    def debug_dump_node(self, target):
-        q = f"""SELECT ?s ?p ?o WHERE {{ ?s rdfs:label ?label . FILTER (REGEX(?label, "{target}", "i")) ?s ?p ?o . }}"""
-        return self.run_query(q)
-
     def list_containers(self):
+        """Retrieves ID, Name, Status, Ports, and associated Image for all containers."""
         q = """
         SELECT DISTINCT ?id ?name ?status ?ports ?displayImage ?hostName
         WHERE {
@@ -53,7 +53,7 @@ class QueryEngine:
         return self.run_query(q)
 
     def get_target_metadata(self, target):
-        # 1. Try as Container
+        """Retrieves metadata (Arch, Size, OS, Created, Status) for a target (Image/Container)."""
         q_cont = f"""
         SELECT ?type ?arch ?size ?osName ?osVer ?created ?status ?ports ?imageName
         WHERE {{
@@ -79,7 +79,6 @@ class QueryEngine:
         res = self.run_query(q_cont)
         if len(res) > 0: return res
 
-        # 2. Try as Image
         q_img = f"""
         SELECT ?type ?arch ?size ?osName ?osVer ?created
         WHERE {{
@@ -100,6 +99,7 @@ class QueryEngine:
         return self.run_query(q_img)
 
     def get_total_package_count(self, target):
+        """Counts total distinct packages installed in a target."""
         q = f"""
         SELECT (COUNT(DISTINCT ?pkg) as ?pkgCount)
         WHERE {{
@@ -116,6 +116,7 @@ class QueryEngine:
         return self.run_query(q)
 
     def get_image_vuln_count(self, image_name):
+        """Counts total distinct vulnerabilities for a specific image."""
         q = f"""
         SELECT (COUNT(DISTINCT ?v) as ?vCount)
         WHERE {{
@@ -128,8 +129,12 @@ class QueryEngine:
         return self.run_query(q)
 
     def assess_target(self, target):
+        """
+        Retrieves full vulnerability report for a target.
+        Includes: Package Name, Version, CVE ID, Severity, Score, Fix availability.
+        """
         q = f"""
-        SELECT DISTINCT ?pkgName ?pkgVersion ?vulnID ?severity ?score ?fixedIn ?pkgURI
+        SELECT DISTINCT ?pkgName ?pkgVersion ?vulnID ?severity ?score ?fixedIn ?pkgURI ?vulnType
         WHERE {{
             {{
                 ?c a c2t:Container ; rdfs:label ?name ; c2t:isInstanceOf ?img .
@@ -147,6 +152,7 @@ class QueryEngine:
             OPTIONAL {{ ?v c2t:severity ?severity }}
             OPTIONAL {{ ?v c2t:score ?score }}
             OPTIONAL {{ ?v c2t:fixedIn ?fixedIn }}
+            OPTIONAL {{ ?v c2t:vulnerabilityType ?vulnType }}
             
             OPTIONAL {{ ?pkg schema:name ?n1 }}
             OPTIONAL {{ ?pkg rdfs:label ?n2 }}
@@ -159,15 +165,14 @@ class QueryEngine:
 
     def get_vulnerability_details(self, vuln_id):
         """
-        Fetches all ontology properties for a specific Vulnerability ID,
-        including the affected package (from Mapping: hasAffectedPackage).
+        Retrieves details for a specific Vulnerability ID (CVE/GHSA).
+        Sorts by description length to prefer verbose entries (e.g., NVD over Alpine).
         """
         q = f"""
         SELECT ?id ?severity ?score ?vector ?fixedIn ?type ?description ?affectedPkg
         WHERE {{
             ?v a c2t:Vulnerability ;
                dct:identifier ?id .
-            
             FILTER (REGEX(?id, "^{vuln_id}$", "i"))
             
             OPTIONAL {{ ?v c2t:severity ?severity }}
@@ -175,14 +180,38 @@ class QueryEngine:
             OPTIONAL {{ ?v c2t:vector ?vector }}
             OPTIONAL {{ ?v c2t:fixedIn ?fixedIn }}
             OPTIONAL {{ ?v c2t:vulnerabilityType ?type }}
-            OPTIONAL {{ ?v dct:description ?description }}
             OPTIONAL {{ ?v c2t:hasAffectedPackage ?affectedPkg }}
+            
+            OPTIONAL {{ ?v dct:description ?descRaw }}
+            BIND(COALESCE(?descRaw, "") AS ?description)
         }}
+        ORDER BY DESC(STRLEN(?description))
         LIMIT 1
         """
         return self.run_query(q)
 
+    def get_vulnerability_impact(self, vuln_id):
+        """Finds all Images and Containers affected by a specific Vulnerability."""
+        q = f"""
+        SELECT DISTINCT ?imageName ?containerName
+        WHERE {{
+            ?v a c2t:Vulnerability ; dct:identifier ?id .
+            FILTER (REGEX(?id, "^{vuln_id}$", "i"))
+            
+            ?pkg c2t:hasVulnerability ?v .
+            ?layer c2t:hasPackageVersion ?pkg .
+            ?img c2t:hasLayer ?layer ; rdfs:label ?imageName .
+            
+            OPTIONAL {{
+                ?c c2t:isInstanceOf ?img ; rdfs:label ?containerName .
+            }}
+        }}
+        ORDER BY ?imageName
+        """
+        return self.run_query(q)
+
     def get_image_metadata(self, image_name):
+        """Retrieves OS, Architecture, and Creation Date for an image."""
         q = f"""
         SELECT DISTINCT ?arch ?size ?osName ?osVer ?created
         WHERE {{
@@ -203,6 +232,7 @@ class QueryEngine:
         return self.run_query(q)
 
     def get_image_packages_simple(self, image_name):
+        """Simple list of packages and versions for 'diff' command."""
         q = f"""
         SELECT DISTINCT ?pkgName ?version
         WHERE {{
@@ -221,9 +251,7 @@ class QueryEngine:
         return self.run_query(q)
 
     def affected_containers_by_lib(self, lib_name):
-        """
-        Req 1: Count vulnerabilities for the specific package found.
-        """
+        """Finds containers using a specific library/package."""
         q = f"""
         SELECT DISTINCT ?containerName ?imageName ?pkgName ?version (COUNT(?v) as ?vulns)
         WHERE {{
@@ -246,9 +274,7 @@ class QueryEngine:
         return self.run_query(q)
 
     def images_with_app(self, app_name):
-        """
-        Req 6: Include package match name and vulnerability count.
-        """
+        """Finds images containing a specific package."""
         q = f"""
         SELECT DISTINCT ?imageName ?pkgName ?version (COUNT(?v) as ?vulns)
         WHERE {{
@@ -270,6 +296,7 @@ class QueryEngine:
         return self.run_query(q)
 
     def image_libraries(self, image_name):
+        """Retrieves full SBOM (name, version, type) for an image."""
         q = f"""
         SELECT DISTINCT ?pkgName ?version ?type
         WHERE {{
@@ -287,6 +314,7 @@ class QueryEngine:
         return self.run_query(q)
 
     def images_os(self):
+        """Retrieves OS distribution for all images."""
         q = """
         SELECT DISTINCT ?imageName ?osName
         WHERE {
@@ -297,6 +325,7 @@ class QueryEngine:
         return self.run_query(q)
 
     def image_metadata(self):
+        """Retrieves generic metadata and build history for all images."""
         q = """
         SELECT DISTINCT ?imageName ?created ?arch ?history
         WHERE {
@@ -306,5 +335,96 @@ class QueryEngine:
             OPTIONAL { ?img c2t:architecture ?arch }
             OPTIONAL { ?img c2t:hasBuildHistory ?history }
         }
+        """
+        return self.run_query(q)
+
+    def get_top_risky_images(self, limit=10):
+        """Ranks images by count of Critical and High vulnerabilities."""
+        q = f"""
+        SELECT ?imageName (COUNT(?v) as ?riskCount)
+        WHERE {{
+            ?img a c2t:Image ; rdfs:label ?imageName .
+            ?img c2t:hasLayer/c2t:hasPackageVersion ?pkg .
+            ?pkg c2t:hasVulnerability ?v .
+            ?v c2t:severity ?sev .
+            FILTER (LCASE(STR(?sev)) IN ('critical', 'high'))
+        }}
+        GROUP BY ?imageName
+        ORDER BY DESC(?riskCount)
+        LIMIT {limit}
+        """
+        return self.run_query(q)
+
+    def get_top_risky_containers(self, limit=10):
+        """Ranks containers by count of Critical and High vulnerabilities."""
+        q = f"""
+        SELECT ?containerName (COUNT(?v) as ?riskCount)
+        WHERE {{
+            ?c a c2t:Container ; rdfs:label ?containerName ; c2t:isInstanceOf ?img .
+            ?img c2t:hasLayer/c2t:hasPackageVersion ?pkg .
+            ?pkg c2t:hasVulnerability ?v .
+            ?v c2t:severity ?sev .
+            FILTER (LCASE(STR(?sev)) IN ('critical', 'high'))
+        }}
+        GROUP BY ?containerName
+        ORDER BY DESC(?riskCount)
+        LIMIT {limit}
+        """
+        return self.run_query(q)
+
+    def get_layer_info(self, image_name):
+        """
+        Retrieves forensic data for image layers: ID, Size, Build Instruction, and Order Index.
+        Used for 'c2t layers' command.
+        """
+        q = f"""
+        SELECT ?layerID ?size ?instruction ?index (COUNT(DISTINCT ?pkg) as ?pkgCount) (COUNT(DISTINCT ?v) as ?vulnCount)
+        WHERE {{
+            ?img a c2t:Image ; rdfs:label ?name .
+            FILTER (REGEX(?name, "{image_name}", "i"))
+            
+            ?img c2t:hasLayer ?layer .
+            
+            ?layer dct:identifier ?layerID .
+            OPTIONAL {{ ?layer c2t:instruction ?instruction }}
+            OPTIONAL {{ ?layer dpv:size ?size }}
+            OPTIONAL {{ ?layer c2t:layerIndex ?index }}
+            
+            OPTIONAL {{ 
+                ?layer c2t:hasPackageVersion ?pkg .
+                OPTIONAL {{ ?pkg c2t:hasVulnerability ?v }}
+            }}
+        }}
+        GROUP BY ?layerID ?size ?instruction ?index
+        ORDER BY ?index
+        """
+        return self.run_query(q)
+    
+    def audit_package_versions(self, pkg_name):
+        """
+        Retrieves all versions of a specific package across the graph, 
+        listing vulnerabilities for each version to detect safe vs unsafe versions.
+        """
+        q = f"""
+        SELECT DISTINCT ?pkgName ?version ?vulnID ?severity ?fixedIn
+        WHERE {{
+            ?pkg a c2t:PackageVersion .
+            
+            OPTIONAL {{ ?pkg schema:name ?n1 }}
+            OPTIONAL {{ ?pkg rdfs:label ?n2 }}
+            BIND(COALESCE(?n1, ?n2, "Unknown") AS ?pkgName)
+            
+            FILTER (REGEX(?pkgName, "^{pkg_name}$", "i") || REGEX(?pkgName, "^{pkg_name}[^a-zA-Z0-9]", "i"))
+            
+            ?pkg schema:hasVersion ?version .
+
+            OPTIONAL {{
+                ?pkg c2t:hasVulnerability ?v .
+                ?v dct:identifier ?vulnID .
+                OPTIONAL {{ ?v c2t:severity ?severity }}
+                OPTIONAL {{ ?v c2t:fixedIn ?fixedIn }}
+            }}
+        }}
+        ORDER BY ?pkgName ?version ?severity
         """
         return self.run_query(q)

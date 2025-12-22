@@ -105,7 +105,10 @@ mappings:
     s: c2ti:ImageLayer/$(id)
     po:
       - [a, c2t:ImageLayer]
+      - [dct:identifier, $(id), xsd:string]
       - [dpv:size, $(size), xsd:integer]
+      - [c2t:instruction, $(command), xsd:string]
+      - [c2t:layerIndex, $(index), xsd:integer]
 
   ImageLayerRelationMapping:
     sources: [['unified_data.json~jsonpath', '$.image_layer_relations[*]']]

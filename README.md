@@ -13,7 +13,7 @@ The application follows a modular pipeline designed to extract, unify, and seman
     The raw outputs are processed to normalize data structures, extract relevant metadata (creation dates, architecture, ports), and clean identifiers.
 
 3.  **Unification (`src/unifier.py`):**
-    All parsed data is aggregated into a single JSON structure (`unified_data.json`). This module then triggers **Morph-KGC** to map this JSON into RDF Triples using the rules defined in `mappings/mapping_host.yarrrrml.yaml`.
+    All parsed data is aggregated into a single JSON structure (`unified_data.json`). This module implements **forensic heuristics** to align physical filesystem layers (`RootFS`) with logical build instructions (`History`). It then triggers **Morph-KGC** to map this JSON into RDF Triples using the rules defined in `mappings/mapping_host.yarrrrml.yaml`.
 
 4.  **Graph Generation (`output/docker_graph.nt`):**
     The result is an N-Triples file representing the current state of the host, including relationships between images, layers, packages, and vulnerabilities.
@@ -107,28 +107,62 @@ c2t list --running
 ### 3. Assess Vulnerabilities
 Performs a security audit on a specific container or image. It displays metadata and a list of package vulnerabilities grouped by severity.
 
+**Note:** Options must be placed **after** the target name.
+
 ```bash
-c2t assess <TARGET>
+c2t assess <TARGET> [OPTIONS]
 ```
 
-**Filter by Severity:**
-Use the `--filter` flag to show only **HIGH** and **CRITICAL** vulnerabilities, removing the noise of low-impact alerts.
+**Options:**
+*   `--filter`: Shows only **HIGH** and **CRITICAL** vulnerabilities.
+*   `--fixable`: Shows only vulnerabilities with a fix available.
+
+**Example:**
 ```bash
-c2t assess nginx:latest --filter
+c2t assess nginx:latest --filter --fixable
 ```
 
-### 4. Vulnerability Details
-Shows comprehensive information about a specific vulnerability ID, including CVSS score, vector, and description.
+### 4. Top Risks
+Shows a ranking of the most vulnerable images and containers based on the count of critical and high vulnerabilities.
 
 ```bash
-c2t vuln <CVE_ID>
+c2t top-risks
+```
+
+### 5. Vulnerability Details
+Shows comprehensive information about a specific vulnerability ID, including CVSS score, vector, and description. Supports CVE, GHSA, RHSA, etc.
+
+```bash
+c2t vuln <VULN_ID>
 ```
 **Example:**
 ```bash
 c2t vuln CVE-2021-44228
 ```
 
-### 5. Image Comparison
+### 6. Audit Package Versions
+Audits a specific package across the entire infrastructure. It groups the results by version, allowing you to easily identify which versions installed in your environment are safe and which are vulnerable.
+
+```bash
+c2t check-pkg <PACKAGE_NAME>
+```
+**Example:**
+```bash
+c2t check-pkg musl
+```
+
+### 7. Layer Forensics
+Performs a forensic analysis of an image's layers. It correlates the physical layers with the build history to show **exactly which command** (RUN, COPY, ADD) created each layer, its size, and how many packages or vulnerabilities were introduced in that specific step.
+
+```bash
+c2t layers <IMAGE_NAME>
+```
+**Example:**
+```bash
+c2t layers my-web-app:latest
+```
+
+### 8. Image Comparison
 Compares two images side-by-side. It displays:
 1.  **Main Comparison:** Metadata (OS, Size, Date) and Total Vulnerability count.
 2.  **Libraries Comparison:** A table comparing package versions (Green=Match, Yellow=Version Change, Red=Missing).
@@ -141,7 +175,7 @@ c2t diff <IMAGE_1> <IMAGE_2>
 c2t diff redis:6.2-alpine redis:7.2-alpine
 ```
 
-### 6. Find Containers With Package
+### 9. Find Containers With Package
 Finds which **deployed containers** depend on a specific package. Useful for incident response (e.g., checking if `openssl` is running in production).
 
 ```bash
@@ -152,7 +186,7 @@ c2t containers-with <PACKAGE_NAME>
 c2t containers-with openssl
 ```
 
-### 7. Find Images With Package
+### 10. Find Images With Package
 Finds which **images** in the local catalog contain a specific package. Useful for inventory management.
 
 ```bash
@@ -163,19 +197,19 @@ c2t images-with <PACKAGE_NAME>
 c2t images-with python
 ```
 
-### 8. Metadata
+### 11. Metadata
 Retrieves metadata for all images and shows the reconstructed **Build History** (Dockerfile commands) extracted from the image layers.
 ```bash
 c2t metadata
 ```
 
-### 9. Operating System Report
+### 12. Operating System Report
 Generates a summary of the Operating System families detected in the local registry.
 ```bash
 c2t report-os
 ```
 
-### 10. Show SBOM
+### 13. Show SBOM
 Lists all installed packages and versions for a specific image.
 ```bash
 c2t show-libs <IMAGE_NAME>

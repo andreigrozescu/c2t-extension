@@ -5,11 +5,12 @@ from pathlib import Path
 from urllib.parse import unquote
 
 def sanitize(s: str) -> str:
+    """Sanitizes strings for URI safety."""
     if s is None: return ""
     return str(s).replace(":", "_").replace("/", "_")
 
 def clean_purl(purl: str) -> str:
-    """Removes query params from PURL."""
+    """Removes query params from PURL (Package URL)."""
     if not purl: return ""
     base_purl = purl.split('?')[0]
     return unquote(base_purl)
@@ -17,7 +18,6 @@ def clean_purl(purl: str) -> str:
 def extract_cvss(vuln_obj):
     """
     Helper to extract the best CVSS Score and Vector from a vulnerability object.
-    Prioritizes CVSS v3 over v2.
     """
     score = 0.0
     vector = ""
@@ -44,14 +44,14 @@ def extract_cvss(vuln_obj):
 
 def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str) -> dict:
     """
-    Reads Syft and Grype JSON outputs.
-    Extracts OS, Packages, Layers, and Vulnerabilities with robust fallback logic.
+    Reads Syft (SBOM) and Grype (Vulnerabilities) JSON outputs.
+    Merges data to extract OS, Packages, Layers, and Vulnerabilities.
     """
     os_info, packages, layers = None, [], []
     syft_file = Path(syft_path)
     grype_file = Path(grype_path)
 
-    # --- PARSE SYFT ---
+    # --- PARSE SYFT (SBOM) ---
     try:
         with open(syft_file, 'r', encoding='utf-8') as f:
             syft_data = json.load(f)
@@ -59,6 +59,7 @@ def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str
         syft_data = {}
 
     if syft_data:
+        # Extract OS Distribution
         distro = syft_data.get('distro') or syft_data.get('source', {}).get('metadata', {}).get('distro')
         if distro:
             name = distro.get('name', '') if isinstance(distro, dict) else str(distro)
@@ -75,6 +76,7 @@ def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str
                 "image_identifier": sanitize(image_identifier)
             }
 
+        # Extract Layer Sizes
         source_meta = syft_data.get('source', {}).get('metadata', {})
         raw_layers = source_meta.get('layers', [])
         for l in raw_layers:
@@ -87,6 +89,7 @@ def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str
                     "image_identifier": sanitize(image_identifier)
                 })
 
+        # Extract Packages
         if syft_data.get('artifacts'):
             for artifact in syft_data['artifacts']:
                 raw_purl = artifact.get('purl') or artifact.get('id') or ""
@@ -96,6 +99,7 @@ def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str
                 pkg_type = artifact.get('type') or artifact.get('pkg_type') or ""
                 layer_id = ""
                 
+                # Link package to a specific layer
                 locations = artifact.get('locations') or []
                 if locations and isinstance(locations, list):
                     for loc in locations:
@@ -116,7 +120,7 @@ def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str
 
     logging.info(f"Parsed Syft for '{image_identifier}': {len(packages)} packages and {len(layers)} layers info found.")
 
-    # --- PARSE GRYPE ---
+    # --- PARSE GRYPE (Vulnerabilities) ---
     vulnerabilities = []
     try:
         with open(grype_file, 'r', encoding='utf-8') as f:
@@ -136,6 +140,7 @@ def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str
                 description = vuln.get('description', '')
                 cvss_score, cvss_vector = extract_cvss(vuln)
                 
+                # Check related vulnerabilities if description/score missing
                 if not description or not cvss_vector:
                     relateds = vuln.get('relatedVulnerabilities', [])
                     for rel in relateds:
@@ -154,7 +159,7 @@ def parse_image_artifacts(syft_path: str, grype_path: str, image_identifier: str
                 if not description and vuln.get('detail'):
                      description = vuln.get('detail')
                 
-                # Fields
+                # Extract Fix version
                 fixed_in = ""
                 if vuln.get('fix'):
                     versions = vuln.get('fix', {}).get('versions', [])

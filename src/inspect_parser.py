@@ -4,12 +4,16 @@ import logging
 from pathlib import Path
 
 def sanitize(s: str) -> str:
+    """Sanitizes strings for safe URI or filename usage."""
     if s is None: return ""
     return s.replace(":", "_").replace("/", "_")
 
 def parse_inspect_file(file_path: str) -> dict | None:
     """
     Parses a Docker inspect JSON file to extract relevant fields.
+    
+    Extracts: ID, Name, Image, Status, Created date, Ports, Arch, Size, and History log.
+    Handles differences in RepoTags vs Config.Image for image names.
     """
     try:
         path = Path(file_path)
@@ -18,16 +22,18 @@ def parse_inspect_file(file_path: str) -> dict | None:
         if not data:
             return None
         
+        # Docker inspect returns a list
         info = data[0]
         
         # Container Name
         name = info.get("Name", "").lstrip('/')
         raw_image = info.get("Config", {}).get("Image", "")
         
-        # Image Name
+        # Image Name Normalization
         if raw_image and ":" not in raw_image and not raw_image.startswith("sha256:"):
             raw_image += ":latest"
             
+        # Use RepoTags if available for better readable names
         if raw_image.startswith("sha256:") and "RepoTags" in info and info["RepoTags"]:
              raw_image = info["RepoTags"][0]
 
@@ -47,6 +53,7 @@ def parse_inspect_file(file_path: str) -> dict | None:
         # Metadata
         size = info.get("Size", 0)
         arch = info.get("Architecture", "unknown")
+        history_log = info.get("History", [])
         
         return {
             "id": info.get("Id", ""),
@@ -57,7 +64,8 @@ def parse_inspect_file(file_path: str) -> dict | None:
             "created": str(created),
             "ports": ports,
             "arch": arch,
-            "size": size
+            "size": size,
+            "history_log": history_log 
         }
 
     except (json.JSONDecodeError, IndexError, FileNotFoundError) as e:
