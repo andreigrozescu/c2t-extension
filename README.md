@@ -129,7 +129,7 @@ c2t vuln <CVE_ID>
 c2t vuln CVE-2021-44228
 ```
 
-### 5. Image Comparison (Diff)
+### 5. Image Comparison
 Compares two images side-by-side. It displays:
 1.  **Main Comparison:** Metadata (OS, Size, Date) and Total Vulnerability count.
 2.  **Libraries Comparison:** A table comparing package versions (Green=Match, Yellow=Version Change, Red=Missing).
@@ -142,7 +142,7 @@ c2t diff <IMAGE_1> <IMAGE_2>
 c2t diff redis:6.2-alpine redis:7.2-alpine
 ```
 
-### 6. Impact Analysis (Containers)
+### 6. Find Containers With Package
 Finds which **deployed containers** depend on a specific package. Useful for incident response (e.g., checking if `openssl` is running in production).
 
 ```bash
@@ -153,7 +153,7 @@ c2t containers-with <PACKAGE_NAME>
 c2t containers-with openssl
 ```
 
-### 7. Inventory Search (Images)
+### 7. Find Images With Package
 Finds which **images** in the local catalog contain a specific package. Useful for inventory management.
 
 ```bash
@@ -186,4 +186,4 @@ c2t show-libs <IMAGE_NAME>
 
 The following diagram represents the semantic model (Ontology) used to structure the knowledge graph. It defines the relationships between the Host, Containers, Images, Layers, Packages, and Vulnerabilities.
 
-![C2T Ontology Diagram](ontology/ontology.png)
+![alt text](ontology/ontology.jpg)
