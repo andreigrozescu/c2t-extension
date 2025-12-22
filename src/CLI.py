@@ -8,10 +8,13 @@ from pathlib import Path
 from urllib.parse import unquote
 from . import logic, queries
 
+# Configure logging with timestamps
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s', datefmt='%H:%M:%S')
 
+# Path to the RDF Knowledge Graph
 OUTPUT_FILE = Path(__file__).parent.parent / "output" / "docker_graph.nt"
 
+# Definition of severity levels for filtering
 SEVERITY_LEVELS = {
     "CRITICAL": 5,
     "HIGH": 4,
@@ -21,14 +24,19 @@ SEVERITY_LEVELS = {
     "UNKNOWN": 0
 }
 
-@click.group(epilog="Run 'c2t COMMAND --help' for more information.")
+# --- MAIN CLI GROUP ---
+@click.group(epilog="Run 'c2t COMMAND --help' for more information on a specific command.")
 def cli():
     """
     \b
     C2T: Tool for Docker Security Auditing and Forensic Traceability.
+    -----------------------------------------------------------------
+    Generates Knowledge Graphs from Docker containers to analyze 
+    vulnerabilities and software composition (SBOM).
     """
     pass
 
+# --- PROCESS COMMAND ---
 @cli.command(short_help="Analyzes host and generates graph.")
 @click.option('--force', is_flag=True, help="Forces full graph regeneration.")
 def process(force):
@@ -36,36 +44,47 @@ def process(force):
     click.echo(click.style("Starting Docker Host analysis...", fg='green'))
     logic.process_incremental(OUTPUT_FILE, force_rebuild=force)
 
-def get_qe():
+# --- HELPER FUNCTIONS ---
+
+def get_query_engine():
+    """Initializes the query engine or exits if graph is missing."""
     if not OUTPUT_FILE.exists():
         click.echo(click.style("Error: The graph does not exist. Run 'c2t process' first.", fg='red'))
         sys.exit(1)
     return queries.QueryEngine(OUTPUT_FILE)
 
-# --- HELPERS ---
 def extract_name_from_uri(uri_str):
+    """Extracts the package name from a PURL URI."""
     try:
         decoded = unquote(str(uri_str))
         if "pkg:" in decoded:
             purl_part = decoded.split("pkg:")[-1]
-            if "/" in purl_part: name_ver = purl_part.split("/")[-1]
-            else: name_ver = purl_part
+            if "/" in purl_part: 
+                name_ver = purl_part.split("/")[-1]
+            else: 
+                name_ver = purl_part
             return name_ver.split("@")[0]
-    except: pass
+    except: 
+        pass
     return "Unknown Package"
 
 def split_package_version(pkg_name, version):
+    """Splits name and version if they are combined."""
     pkg = str(pkg_name)
     ver = str(version) if version else "unknown"
-    if ver.lower() in ["none", "unknown", "n/a", ""] and " " in pkg:
+    
+    is_invalid_ver = ver.lower() in ["none", "unknown", "n/a", ""]
+    if is_invalid_ver and " " in pkg:
         try:
             parts = pkg.split(" ", 1)
             if len(parts) > 1 and (parts[1][0].isdigit() or parts[1].lower().startswith('v')):
                 return parts[0], parts[1]
-        except: pass
+        except: 
+            pass
     return pkg, ver
 
 def format_ports(ports_str):
+    """Formats the raw ports string from Docker."""
     s = str(ports_str)
     if not s or s == "{}" or "None" in s:
         raw = re.findall(r"(\d+/(?:tcp|udp))", s)
@@ -77,13 +96,17 @@ def format_ports(ports_str):
         if mappings and internal:
             pairs = []
             for i, m in enumerate(mappings):
-                if i < len(internal): pairs.append(f"{m}->{internal[i]}")
+                if i < len(internal): 
+                    pairs.append(f"{m}->{internal[i]}")
             return ", ".join(pairs)
+        
         raw_keys = re.findall(r"['\"](\d+/(?:tcp|udp))['\"]", s)
         if raw_keys: return ", ".join(sorted(set(raw_keys)))
+        
         raw = re.findall(r"(\d+/(?:tcp|udp))", s)
         return ", ".join(sorted(set(raw)))
-    except: return ""
+    except: 
+        return ""
 
 # --- COMMANDS ---
 
@@ -91,22 +114,27 @@ def format_ports(ports_str):
 @click.option('--running', is_flag=True, help="Show only running containers.")
 def list_containers(running):
     """Lists deployed containers."""
-    qe = get_qe()
+    qe = get_query_engine()
     results = qe.list_containers()
     
     total = len(results)
     stats = {"running": 0, "exited": 0, "paused": 0}
     filtered_results = []
-
+    
+    # Process results for stats and filtering
     for r in results:
         status_val = getattr(r, 'status', 'unknown')
         s = str(status_val).lower()
+        
+        # Count stats
         if "up" in s or "running" in s: stats["running"] += 1
         elif "exited" in s: stats["exited"] += 1
         else: stats["paused"] += 1
         
+        # Apply filter 
         if running:
-            if "up" in s or "running" in s: filtered_results.append(r)
+            if "up" in s or "running" in s:
+                filtered_results.append(r)
         else:
             filtered_results.append(r)
 
@@ -137,14 +165,15 @@ def list_containers(running):
         image = str(img_val)[:28] + ".." if len(str(img_val)) > 29 else str(img_val)
         status = str(stat_val)
         ports = format_ports(ports_val)
+        
         click.echo(f"{host:<12} {name:<25} {c_id:<14} {image:<30} {status:<12} {ports}")
 
-@cli.command(short_help="Audits security (Containers OR Images).")
+@cli.command(short_help="Assess security of containers and images.")
 @click.argument('target')
 @click.option('--filter', is_flag=True, help="Show only HIGH and CRITICAL vulnerabilities.")
 def assess(target, filter):
     """Evaluates vulnerabilities."""
-    qe = get_qe()
+    qe = get_query_engine()
     
     # 1. Metadata
     meta_res = qe.get_target_metadata(target)
@@ -238,6 +267,7 @@ def assess(target, filter):
     if filter:
         click.echo(click.style("Filter active: Showing HIGH and CRITICAL only.", fg='cyan'))
     click.echo("")
+
     click.echo(f"{'SEV':<10} {'SCORE':<6} {'VULN ID':<20} {'PKG NAME':<25} {'VERSION':<15} {'FIXED IN'}")
     click.echo("-" * 95)
     for row in filtered_results:
@@ -270,7 +300,7 @@ def vuln(vuln_id):
     """
     Shows detailed information about a specific vulnerability ID.
     """
-    qe = get_qe()
+    qe = get_query_engine()
     results = qe.get_vulnerability_details(vuln_id)
     
     found = False
@@ -316,8 +346,9 @@ def vuln(vuln_id):
 @click.argument('img1')
 @click.argument('img2')
 def diff(img1, img2):
+    """Compares two images (Metadata + Unified Library Table)."""
     try:
-        qe = get_qe()
+        qe = get_query_engine()
         
         # --- METADATA ---
         def get_meta(img_name):
@@ -383,6 +414,7 @@ def diff(img1, img2):
             ver1 = p1.get(lib)
             ver2 = p2.get(lib)
 
+            # Define colors
             if ver1 is None:
                 txt1 = click.style("None", fg='red')
                 len1 = 4
@@ -414,7 +446,7 @@ def diff(img1, img2):
 @click.argument('pkg_name')
 def containers_with(pkg_name):
     """Finds which deployed CONTAINERS depend on a specific package."""
-    qe = get_qe()
+    qe = get_query_engine()
     results = qe.affected_containers_by_lib(pkg_name)
     
     if not results:
@@ -449,7 +481,7 @@ def containers_with(pkg_name):
 @click.argument('pkg_name')
 def images_with(pkg_name):
     """Finds which IMAGES in the catalog contain a specific package/app."""
-    qe = get_qe()
+    qe = get_query_engine()
     results = qe.images_with_app(pkg_name)
     
     if not results:
