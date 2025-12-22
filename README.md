@@ -54,7 +54,6 @@ Installation can be done using **Poetry** or a standard Python **virtual environ
 
 3.  Activate the environment:
     ```bash
-    # Universal method
     source $(poetry env info --path)/bin/activate
     ```
 
