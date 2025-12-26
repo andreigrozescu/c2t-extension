@@ -123,7 +123,7 @@ c2t assess nginx:latest --filter --fixable
 ```
 
 ### 4. Top Risks
-Shows a ranking of the most vulnerable images and containers based on the count of critical and high vulnerabilities.
+Shows a ranking of the most dangerous images and containers based on the count of critical and high vulnerabilities.
 
 ```bash
 c2t top-risks
@@ -165,7 +165,7 @@ c2t layers my-web-app:latest
 ### 8. Image Comparison
 Compares two images side-by-side. It displays:
 1.  **Main Comparison:** Metadata (OS, Size, Date) and Total Vulnerability count.
-2.  **Libraries Comparison:** A table comparing package versions (Green=Match, Yellow=Version Change, Red=Missing).
+2.  **Package Comparison:** A table comparing package versions (Green=Match, Yellow=Version Change, Red=Missing).
 
 ```bash
 c2t diff <IMAGE_1> <IMAGE_2>
@@ -187,7 +187,7 @@ c2t containers-with openssl
 ```
 
 ### 10. Find Images With Package
-Finds which **images** in the local catalog contain a specific package. Useful for inventory management.
+Finds which **images** in the local catalog contain a specific **software package**. Useful for inventory management.
 
 ```bash
 c2t images-with <PACKAGE_NAME>
@@ -209,10 +209,10 @@ Generates a summary of the Operating System families detected in the local regis
 c2t report-os
 ```
 
-### 13. Show SBOM
-Lists all installed packages and versions for a specific image.
+### 13. Show Packages (SBOM)
+Generates the SBOM and lists all installed **system and application packages** for a specific image.
 ```bash
-c2t show-libs <IMAGE_NAME>
+c2t show-pkgs <IMAGE_NAME>
 ```
 
 ## Ontology Model

@@ -63,7 +63,7 @@ def get_query_engine():
 # --- HELPERS ---
 
 def sizeof_fmt(num):
-    """Calculate human-readable size."""
+    """Calculates human-readable size (Base 10 to match Docker CLI)."""
     try:
         num = float(num)
     except (ValueError, TypeError):
@@ -184,7 +184,6 @@ def list_containers(running):
         stat_val = getattr(row, 'status', 'unknown')
         ports_val = getattr(row, 'ports', '')
 
-        # Truncate long names for display
         name = str(n_val)[:23] + ".." if len(str(n_val)) > 24 else str(n_val)
         c_id = str(id_val)[:12]
         image = str(img_val)[:28] + ".." if len(str(img_val)) > 29 else str(img_val)
@@ -222,7 +221,7 @@ def assess(target, filter, fixable):
     """
     qe = get_query_engine()
     
-    # 1.Metadata
+    # 1. Metadata
     meta_res = qe.get_target_metadata(target)
     
     data = {
@@ -253,7 +252,7 @@ def assess(target, filter, fixable):
         if getattr(row, 'ports', None): data["ports"] = format_ports(str(row.ports))
         if getattr(row, 'imageName', None): data["image"] = str(row.imageName)
     
-    # 2.Package Count
+    # 2. Package Count
     count_res = qe.get_total_package_count(target)
     total_pkgs = 0
     for row in count_res:
@@ -399,7 +398,7 @@ def check_pkg(pkg_name):
         for ver in sorted(data[name].keys()):
             vulns = data[name][ver]
             
-            # Status Label
+            # Status label
             if not vulns:
                 status_label = click.style("[SAFE]", fg='green', bold=False)
             else:
@@ -504,12 +503,12 @@ def vuln(vuln_id):
         click.echo("No local images or containers affected by this vulnerability.")
     click.echo("")
 
-@cli.command(short_help="Compares libraries between images.")
+@cli.command(short_help="Compares packages between images.")
 @click.argument('img1')
 @click.argument('img2')
 def diff(img1, img2):
     """
-    Compares two IMAGES side-by-side to detect version changes in libraries.
+    Compares two IMAGES side-by-side to detect version changes in packages.
     
     \b
     USAGE:
@@ -570,13 +569,13 @@ def diff(img1, img2):
         p2 = get_pkgs_dict(img2)
         all_keys = sorted(list(set(p1.keys()) | set(p2.keys())))
 
-        click.echo(click.style(f"[LIBRARIES COMPARISON]", bold=True))
+        click.echo(click.style(f"[PACKAGE COMPARISON]", bold=True))
         col1_w = 40
         col2_w = 35
         col3_w = 35
         h1 = (img1[:32] + '..') if len(img1) > 33 else img1
         h2 = (img2[:32] + '..') if len(img2) > 33 else img2
-        click.echo(f"{'LIBRARY':<{col1_w}} {h1:<{col2_w}} {h2:<{col3_w}}")
+        click.echo(f"{'PACKAGE':<{col1_w}} {h1:<{col2_w}} {h2:<{col3_w}}")
         click.echo("-" * (col1_w + col2_w + col3_w))
 
         for lib in all_keys:
@@ -669,12 +668,12 @@ def images_with(pkg_name):
         v_str = click.style(str(v_count), fg='red' if v_count > 0 else 'green')
         click.echo(f"{img:<35} {pkg:<25} {ver:<20} {v_str}")
 
-@cli.command(short_help="Shows image SBOM.")
+@cli.command(name='show-pkgs', short_help="Shows image SBOM.")
 @click.argument('image')
-def show_libs(image):
-    """Lists all libraries (SBOM) in a specific image."""
+def show_pkgs(image):
+    """Lists all installed packages (SBOM) in a specific image."""
     qe = get_query_engine()
-    results = qe.image_libraries(image)
+    results = qe.get_image_packages(image)
     click.echo(click.style(f"\n[SBOM SUMMARY] Image: {image}", bold=True))
     click.echo(f"Total Packages Installed: {len(results)}")
     click.echo("")

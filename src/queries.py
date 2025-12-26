@@ -2,7 +2,6 @@ import rdflib
 import logging
 from pathlib import Path
 
-# Common SPARQL Prefixes used in all queries
 PREFIXES = """
     PREFIX c2t: <https://w3id.org/c2t/o#>
     PREFIX c2ti: <https://w3id.org/c2t/instance/>
@@ -295,7 +294,7 @@ class QueryEngine:
         """
         return self.run_query(q)
 
-    def image_libraries(self, image_name):
+    def get_image_packages(self, image_name):
         """Retrieves full SBOM (name, version, type) for an image."""
         q = f"""
         SELECT DISTINCT ?pkgName ?version ?type

@@ -18,6 +18,7 @@ def clean_purl(purl: str) -> str:
 def extract_cvss(vuln_obj):
     """
     Helper to extract the best CVSS Score and Vector from a vulnerability object.
+    Prioritizes CVSS v3 over v2.
     """
     score = 0.0
     vector = ""

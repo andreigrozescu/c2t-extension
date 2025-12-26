@@ -79,9 +79,9 @@ def get_analyzed_images(graph_path: Path):
 def process_incremental(output_graph_path: Path, force_rebuild=False):
     """
     Main orchestration logic.
-    1. Checks host state (Docker).
+    1. Checks host state.
     2. Compares with existing graph (Incremental update).
-    3. Runs Syft, Grype, Docker Inspect/History for new items.
+    3. Runs Syft, Grype, Docker inspect and Docker history for new items.
     4. Unifies data and generates RDF triples.
     """
     check_dependencies()

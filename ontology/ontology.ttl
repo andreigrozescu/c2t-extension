@@ -86,14 +86,15 @@ c2t:hasVulnerability rdf:type owl:ObjectProperty ;
     rdfs:range c2t:Vulnerability ;
     rdfs:label "hasVulnerability"@en ;
     rdfs:comment "Indicates that a software component (Package or OS) is affected by a specific Vulnerability."@en ;
-    rdfs:isDefinedBy <https://w3id.org/c2t/o#hasVulnerability> .
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#hasVulnerability> ;
+    owl:inverseOf c2t:affectsPackageVersion .
 
-c2t:distributionOf rdf:type owl:ObjectProperty ;
-    rdfs:domain c2t:OperatingSystem ;
-    rdfs:range c2t:OperatingSystem ;
-    rdfs:label "distributionOf"@en ;
-    rdfs:comment "Links a specific operating system version/distro to its parent distribution family."@en ;
-    rdfs:isDefinedBy <https://w3id.org/c2t/o#distributionOf> .
+c2t:affectsPackageVersion rdf:type owl:ObjectProperty ;
+    rdfs:domain c2t:Vulnerability ;
+    rdfs:range c2t:PackageVersion ;
+    rdfs:label "affectsPackageVersion"@en ;
+    rdfs:comment "Indicates that a Vulnerability affects a specific PackageVersion."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#affectsPackageVersion> .
 
 #################################################################
 #    Data Properties
@@ -105,13 +106,6 @@ c2t:architecture rdf:type owl:DatatypeProperty ;
     rdfs:label "architecture"@en ;
     rdfs:comment "The CPU architecture (e.g., amd64, arm64) of the Image or Host."@en ;
     rdfs:isDefinedBy <https://w3id.org/c2t/o#architecture> .
-
-c2t:hostType rdf:type owl:DatatypeProperty ;
-    rdfs:domain c2t:Host ;
-    rdfs:range xsd:string ;
-    rdfs:label "hostType"@en ;
-    rdfs:comment "The type of host environment (e.g., virtual machine, physical server, cloud instance)."@en ;
-    rdfs:isDefinedBy <https://w3id.org/c2t/o#hostType> .
 
 c2t:ipAddress rdf:type owl:DatatypeProperty ;
     rdfs:domain c2t:Host ;
@@ -135,7 +129,7 @@ c2t:ports rdf:type owl:DatatypeProperty ;
     rdfs:isDefinedBy <https://w3id.org/c2t/o#ports> .
 
 dpv:size rdf:type owl:DatatypeProperty ;
-    rdfs:domain c2t:Image , c2t:PackageVersion ;
+    rdfs:domain c2t:Image , c2t:PackageVersion , c2t:ImageLayer ;
     rdfs:range xsd:integer ;
     rdfs:label "size"@en ;
     rdfs:comment "The size of the resource in bytes."@en ;
@@ -149,10 +143,10 @@ dpv:tag rdf:type owl:DatatypeProperty ;
     rdfs:isDefinedBy <http://dockerpedia.inf.utfsm.cl/vocab#tag> .
 
 sd:dateCreated rdf:type owl:DatatypeProperty ;
-    rdfs:domain c2t:Image ;
+    rdfs:domain c2t:Image , c2t:Container ;
     rdfs:range xsd:dateTime ;
     rdfs:label "dateCreated"@en ;
-    rdfs:comment "The timestamp when the Image was built or created."@en ;
+    rdfs:comment "The timestamp when the Image or Container was built or created."@en ;
     rdfs:isDefinedBy <http://schema.org/dateCreated> .
 
 sd:hasVersion rdf:type owl:DatatypeProperty ;
@@ -200,7 +194,7 @@ c2t:vulnerabilityType rdf:type owl:DatatypeProperty ;
     rdfs:domain c2t:Vulnerability ;
     rdfs:range xsd:string ;
     rdfs:label "vulnerabilityType"@en ;
-    rdfs:comment "The category or type of the vulnerability (e.g., SQL Injection, Buffer Overflow)."@en ;
+    rdfs:comment "The category or type of the vulnerability (e.g., nvd:cpe, alpine:distro)."@en ;
     rdfs:isDefinedBy <https://w3id.org/c2t/o#vulnerabilityType> .
 
 c2t:hasBuildHistory rdf:type owl:DatatypeProperty ;
@@ -209,6 +203,20 @@ c2t:hasBuildHistory rdf:type owl:DatatypeProperty ;
     rdfs:label "hasBuildHistory"@en ;
     rdfs:comment "The reconstructed build history (Dockerfile instructions) of the image."@en ;
     rdfs:isDefinedBy <https://w3id.org/c2t/o#hasBuildHistory> .
+
+c2t:instruction rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:ImageLayer ;
+    rdfs:range xsd:string ;
+    rdfs:label "instruction"@en ;
+    rdfs:comment "The Dockerfile command (e.g., RUN, COPY) that created this specific layer."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#instruction> .
+
+c2t:layerIndex rdf:type owl:DatatypeProperty ;
+    rdfs:domain c2t:ImageLayer ;
+    rdfs:range xsd:integer ;
+    rdfs:label "layerIndex"@en ;
+    rdfs:comment "The chronological order index of the layer within the image (0 = Base)."@en ;
+    rdfs:isDefinedBy <https://w3id.org/c2t/o#layerIndex> .
 
 #################################################################
 #    Classes
