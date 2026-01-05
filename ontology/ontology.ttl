@@ -82,10 +82,10 @@ c2t:hasPackageVersion rdf:type owl:ObjectProperty ;
     rdfs:isDefinedBy <https://w3id.org/c2t/o#hasPackageVersion> .
 
 c2t:hasVulnerability rdf:type owl:ObjectProperty ;
-    rdfs:domain c2t:PackageVersion , c2t:OperatingSystem ;
+    rdfs:domain c2t:PackageVersion ;
     rdfs:range c2t:Vulnerability ;
     rdfs:label "hasVulnerability"@en ;
-    rdfs:comment "Indicates that a software component (Package or OS) is affected by a specific Vulnerability."@en ;
+    rdfs:comment "Indicates that a software package version is affected by a specific Vulnerability."@en ;
     rdfs:isDefinedBy <https://w3id.org/c2t/o#hasVulnerability> ;
     owl:inverseOf c2t:affectsPackageVersion .
 

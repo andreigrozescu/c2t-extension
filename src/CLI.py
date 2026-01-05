@@ -392,7 +392,7 @@ def check_pkg(pkg_name):
     click.echo(click.style(f"\n[PACKAGE AUDIT REPORT] Query: {pkg_name}", bold=True))
     
     for name in sorted(data.keys()):
-        click.echo(click.style(f"\nLIBRARY: {name}", fg='cyan', bold=True))
+        click.echo(click.style(f"\PACKAGE: {name}", fg='cyan', bold=True))
         click.echo("=" * 60)
         
         for ver in sorted(data[name].keys()):
@@ -641,7 +641,7 @@ def containers_with(pkg_name):
 @click.argument('pkg_name')
 def images_with(pkg_name):
     """
-    Finds which IMAGES in the catalog contain a specific PACKAGE/LIBRARY.
+    Finds which IMAGES in the catalog contain a specific PACKAGE.
     
     \b
     USAGE:
